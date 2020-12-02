@@ -10,8 +10,8 @@ from pathlib import Path
 from transformers import BertTokenizer
 
 # 导入数据加载的包
-from lccc.od.inputters.inputter import get_data
-from lccc.od.inputters.dataset_wb import WBDataset
+from od.inputters.inputter import get_data
+from od.inputters.dataset_wb import WBDataset
 
 
 # 定义日志

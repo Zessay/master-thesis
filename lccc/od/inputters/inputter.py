@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import DataLoader
 from transformers import cached_path
 
-from lccc.od.inputters.dataset_wb import WBDataset, WBdistDataset
+from od.inputters.dataset_wb import WBDataset, WBdistDataset
 
 LCCC_URL = "https://coai-dataset.oss-cn-beijing.aliyuncs.com/CleanWB.zip"
 SPECIAL_TOKENS = ["[CLS]", "[SEP]", "[speaker1]", "[speaker2]"]
