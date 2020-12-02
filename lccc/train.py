@@ -20,7 +20,7 @@ from ignite.contrib.handlers.tensorboard_logger import TensorboardLogger, Output
 from transformers import (OpenAIGPTLMHeadModel, OpenAIGPTConfig, GPT2LMHeadModel, GPT2Config,
                           WEIGHTS_NAME, CONFIG_NAME, AdamW, BertTokenizer)
 
-from lccc.od.inputters.inputter import build_dataloaders, build_dist_loaders
+from od.inputters.inputter import build_dataloaders, build_dist_loaders
 
 logger = logging.getLogger(__file__)
 
