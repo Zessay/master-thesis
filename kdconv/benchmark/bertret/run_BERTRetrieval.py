@@ -47,8 +47,8 @@ class BERTRetrieval(BertPreTrainedModel):
     def forward(self, data, labels=None):
         input_ids, attention_mask, token_type_ids = data['input_ids'], data['input_mask'], data['segment_ids']
         # 得到cls的编码向量
-        _, output_cls = self.bert(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids)
-        pair_output = output_cls
+        outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids)
+        pair_output = outputs[1]
         if labels is not None:
             pair_output = self.dropout(pair_output)
         logits = self.classifier(pair_output)
@@ -158,6 +158,7 @@ def main():
         dm = data_class(file_id=file_id, bert_vocab_name=bert_vocab_name, do_lower_case=do_lower_case, num_choices=num_choices)
         return dm
 
+    logger.info("模型训练侧加载数据")
     if args.cache:
         dataManager = try_cache(load_dataset, (args.datapath, args.vocab_file, args.do_lower_case, args.num_choices),
                                 args.cache_dir,
