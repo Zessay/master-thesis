@@ -5,16 +5,16 @@ from __future__ import print_function
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "../../"))
+import warnings
+warnings.filterwarnings("ignore")
+
 
 import argparse
-import collections
 import logging
 import json
-import math
 import random
 import pickle
 from tqdm import tqdm, trange
-import re
 
 import numpy as np
 import torch
@@ -42,7 +42,7 @@ class BERTRetrieval(BertPreTrainedModel):
         self.dropout = nn.Dropout(bert_config.hidden_dropout_prob)
         self.classifier = nn.Linear(bert_config.hidden_size, 1)
         self.activation = nn.Sigmoid()
-        self.apply(self.init_bert_weights)
+        self.init_weights()
 
     def forward(self, data, labels=None):
         input_ids, attention_mask, token_type_ids = data['input_ids'], data['input_mask'], data['segment_ids']

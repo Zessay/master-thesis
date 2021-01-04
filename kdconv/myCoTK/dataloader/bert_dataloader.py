@@ -6,11 +6,9 @@ from cotk._utils import trim_before_target
 import numpy as np
 import os
 import multiprocessing
-from multiprocessing import Pool
-import tqdm
+import logging
 import time
 from itertools import chain
-from collections import Counter
 import json
 import random
 
@@ -21,6 +19,9 @@ from transformers import BertTokenizer
 
 import jieba
 from gensim.summarization import bm25
+
+
+logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------
 
@@ -179,7 +180,7 @@ class MyBERTRetrieval(BERTLanguageProcessingBase):
     def _load_data(self):
         r'''Loading dataset, invoked by `BERTLanguageProcessingBase.__init__`
         '''
-        print('begin load data...')
+        logger.info("开始读取和处理数据")
         begin_time = time.time()
         origin_data = {}
 
@@ -198,6 +199,8 @@ class MyBERTRetrieval(BERTLanguageProcessingBase):
             # resp_bert则是当前回复转化为id之后的一维列表
             origin_data[key] = {'resp': [], 'post_bert': [], 'resp_bert': []}
             datas = json.load(open("%s/%s.json" % (self._file_path, key), "r", encoding="utf-8"))
+
+            logger.info(f"当前正在处理 {key} 的数据，数据量为{len(datas)}")
 
             # 逐个处理每一组对话
             for data in datas:
@@ -237,7 +240,9 @@ class MyBERTRetrieval(BERTLanguageProcessingBase):
 
                     i += 1
 
+            logger.info(f"{key}文件共获取有效数据{len(corpus_post)}条")
 
+            logger.info("采样负样本用于训练模型")
             # 当前文件的干扰选项
             distractor_file = os.path.join(self._file_path, '%s_distractors.json' % key)
             # 如果存在当前文件的干扰选项（即负样本）
@@ -251,11 +256,13 @@ class MyBERTRetrieval(BERTLanguageProcessingBase):
             else:
                 # 基于回复构建bm25模型
                 # 这里corpus_resp为List[List[str]]，其中每一个str为一个分词之后的单词
+                logger.info("构建BM25模型")
                 bm25Model = bm25.BM25(corpus_resp)
                 # 保存每一次回复的干扰回复
                 origin_data[key]['resp_distractors'] = []
                 origin_data[key]['resp_distractors_bert'] = []
 
+                logger.info("对有效数据中的每一个样本获取其对应的负样本")
                 for idx in range(len(corpus_resp)):
                     # 获取当前回复以及对应的上下文
                     # 都是去除停用词之后的单词列表，posts是多轮的，所以是二维列表
@@ -302,15 +309,16 @@ class MyBERTRetrieval(BERTLanguageProcessingBase):
                 with open(distractor_file, 'w') as f:
                     json.dump(origin_data[key]['resp_distractors'], f, ensure_ascii=False, indent=4)
 
-        print('finish tokenizing sentences...%f' % (time.time() - begin_time))
+        logger.info(f"完成数据读取和负采样，共计用时%f，准备构建词表" % (time.time() - begin_time))
         # 保存BERT词表
         vocab_list = [each for each in self.bert_id2word]
         valid_vocab_len = len(vocab_list)
 
-        print("vocab list length = %d" % len(vocab_list))
+        logger.info(f"词表数量为{len(vocab_list)}")
 
         # 计算每个数据集的大小
         data_size = {key: len(origin_data[key]['resp']) for key in self.key_name}
+        print("数据集统计：", data_size)
         return vocab_list, valid_vocab_len, origin_data, data_size
 
     def get_batch(self, key, indexes):
@@ -451,7 +459,7 @@ class MyMemBERTRetrieval(BERTLanguageProcessingBase):
     def _load_data(self):
         r'''Loading dataset, invoked by `BERTLanguageProcessingBase.__init__`
         '''
-        print('begin load data...')
+        logger.info("开始读取和处理数据")
         begin_time = time.time()
         origin_data = {}
         vocab = {}
@@ -475,6 +483,8 @@ class MyMemBERTRetrieval(BERTLanguageProcessingBase):
             # resp_bert: 表示当前回复对应bert词表的id，List[int]
             origin_data[key] = {'kg_index': [], 'kg': [], 'resp': [], 'post_bert': [], 'resp_bert': []}
             datas = json.load(open("%s/%s.json" % (self._file_path, key), "r", encoding="utf-8"))
+
+            logger.info(f"当前正在处理 {key} 的数据，数据量为{len(datas)}")
 
             for data in datas:
                 # 获取一段对话
@@ -544,6 +554,9 @@ class MyMemBERTRetrieval(BERTLanguageProcessingBase):
 
                     i += 1
 
+            logger.info(f"{key}文件共获取有效数据{len(corpus_post)}条")
+            logger.info("采样负样本用于训练模型")
+
             distractor_file = os.path.join(self._file_path, '%s_distractors.json' % key)
             if os.path.exists(distractor_file):
                 with open(distractor_file) as f:
@@ -554,10 +567,12 @@ class MyMemBERTRetrieval(BERTLanguageProcessingBase):
 
             else:
                 # 基于回复构建BM25模型
+                logger.info("构建BM25模型")
                 bm25Model = bm25.BM25(corpus_resp)
                 origin_data[key]['resp_distractors'] = []
                 origin_data[key]['resp_distractors_bert'] = []
 
+                logger.info("对有效数据中的每一个样本获取其对应的负样本")
                 for idx in range(len(corpus_resp)):
                     posts = corpus_post[idx]    # 上下文
                     resp = corpus_resp[idx]
@@ -597,18 +612,18 @@ class MyMemBERTRetrieval(BERTLanguageProcessingBase):
                 with open(distractor_file, 'w') as f:
                     json.dump(origin_data[key]['resp_distractors'], f, ensure_ascii=False, indent=4)
 
-        print('finish tokenizing sentences...%f' % (time.time() - begin_time))
+        logger.info(f"完成数据读取和负采样，共计用时%f，准备构建词表" % (time.time() - begin_time))
         # 记录单词词表
         vocab_list = [each for each in self.bert_id2word]
         valid_vocab_len = len(vocab_list)
-        print("bert vocab list length = %d" % len(vocab_list))
+        logger.info(f"词表数量为{len(vocab_list)}")
 
         # 知识库中的单词按照从高到低排序
         vocab = sorted(list(vocab.items()), key=lambda pair: (-pair[1], pair[0]))
         # 分词是索引到单词的映射和单词到索引的映射
         self.id2know_word = list(map(lambda x: x[0], vocab))
         self.know_word2id = {w: i for i, w in enumerate(self.id2know_word)}
-        print("knowledge vocab list length = %d" % len(self.id2know_word))
+        logger.info(f"知识库词表的长度：{len(self.id2know_word)}")
 
         know2id = lambda line: list(map(lambda word: self.know_word2id.get(word, self.unk_id), line))
         knows2id = lambda lines: list(map(know2id, lines))
@@ -618,6 +633,7 @@ class MyMemBERTRetrieval(BERTLanguageProcessingBase):
 
         # 计算train, dev, test每一组数据集的大小
         data_size = {key: len(origin_data[key]['resp']) for key in self.key_name}
+        print("数据集统计：", data_size)
         # origin_data就是self.data
         return vocab_list, valid_vocab_len, origin_data, data_size
 
