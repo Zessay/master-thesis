@@ -184,7 +184,7 @@ class MyBERTRetrieval(BERTLanguageProcessingBase):
         origin_data = {}
 
         # 读取停用词
-        with open("../data/resources/hit_stopwords.txt", "r", encoding="utf-8") as f:
+        with open("../../data/resources/hit_stopwords.txt", "r", encoding="utf-8") as f:
             stop_words = set([w.strip() for w in f])
 
 
@@ -461,7 +461,7 @@ class MyMemBERTRetrieval(BERTLanguageProcessingBase):
             for token in tokens:
                 vocab[token] = vocab[token] + 1 if token in vocab else 1
 
-        with open("../data/resources/hit_stopwords.txt", "r", encoding="utf-8") as f:
+        with open("../../data/resources/hit_stopwords.txt", "r", encoding="utf-8") as f:
             stop_words = set([w.strip() for w in f])
 
         # 这里的key_name包含["train", "dev", "test"]
