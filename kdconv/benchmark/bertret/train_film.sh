@@ -6,7 +6,7 @@ python run_BERTRetrieval.py \
 	--do_train \
 	--bert_config_file=/data/models/ptms/chinese_wwm_pytorch/config.json \
 	--vocab_file=/data/models/ptms/chinese_wwm_pytorch/vocab.txt \
-	--init_checkpoint=/data/models/ptms/chinese_wwm_pytorch \
+	--init_checkpoint=/data/models/ptms/chinese_wwm_pytorch/pytorch_model.bin \
 	--name=BERTRetrieval \
 	--num_choices=10 \
 	--train_batch_size=16 \
