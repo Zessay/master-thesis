@@ -47,7 +47,7 @@ class BERTRetrieval(BertPreTrainedModel):
     def forward(self, data, labels=None):
         input_ids, attention_mask, token_type_ids = data['input_ids'], data['input_mask'], data['segment_ids']
         # 得到cls的编码向量
-        _, output_cls = self.bert(input_ids, token_type_ids, attention_mask, output_all_encoded_layers=False)
+        _, output_cls = self.bert(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids)
         pair_output = output_cls
         if labels is not None:
             pair_output = self.dropout(pair_output)
