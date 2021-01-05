@@ -295,6 +295,7 @@ def main():
                 step += 1
                 data = dataManager.get_next_batch(key='train')
 
+            logger.info(f"保存模型 pytorch_model.{int(args.num_train_epochs)}.{epoch+1}.bin")
             output_model_file = os.path.join(args.model_dir, "pytorch_model.%d.%d.bin" % (int(args.num_train_epochs), epoch + 1))
 
             # Save a trained model
@@ -302,7 +303,9 @@ def main():
             torch.save(model_to_save.state_dict(), output_model_file)
 
         # 保存损失
+        logger.info("保存训练过程的loss")
         save_losses(args.model_dir, losses={"loss": losses})
+        logger.info("训练结束")
     # Load a trained model that you have fine-tuned
 
     if args.do_predict:

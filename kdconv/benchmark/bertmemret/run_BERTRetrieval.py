@@ -249,6 +249,7 @@ def main():
         dm = data_class(file_id=file_id, bert_vocab_name=bert_vocab_name, do_lower_case=do_lower_case, num_choices=num_choices)
         return dm
 
+    logger.info("模型训练侧加载数据")
     if args.cache:
         if not os.path.isdir(args.cache_dir):
             os.mkdir(args.cache_dir)
@@ -256,11 +257,13 @@ def main():
                                 args.cache_dir,
                                 data_class.__name__)
         vocab = dataManager.id2know_word
+        logger.info("加载词向量文件")
         embed = try_cache(lambda wv, ez, vl: wordvec_class(wv).load_matrix(ez, vl), (args.wvpath, args.embedding_size, vocab),
                           args.cache_dir, wordvec_class.__name__)
     else:
         dataManager = load_dataset(file_id=args.datapath, bert_vocab_name=args.vocab_file, do_lower_case=args.do_lower_case,
                                    num_choices=args.num_choices)
+        logger.info("加载词向量文件")
         wv = wordvec_class(args.wvpath)
         vocab = dataManager.id2know_word
         embed = wv.load_matrix(args.embedding_size, vocab)
@@ -389,7 +392,7 @@ def main():
 
 
                 if (step + 1) % 1000 == 0:
-                    logger.info("step:{} | loss@{} | kg_loss@{} | kg_acc@{}".format(step,
+                    logger.info("step:{} | loss@{} | kg_loss@{} | kg_acc@{}".format(step + 1,
                                                                                     loss.cpu().item(),
                                                                                     kg_loss.cpu().item(),
                                                                                     kg_acc.cpu().item()))
@@ -397,6 +400,7 @@ def main():
                 step += 1
                 data = dataManager.get_next_batch(key='train')
 
+            logger.info(f"保存模型 pytorch_model.{int(args.num_train_epochs)}.{epoch+1}.bin")
             output_model_file = os.path.join(args.model_dir,
                                              "pytorch_model.%d.%d.bin" % (int(args.num_train_epochs), epoch + 1))
 
@@ -405,9 +409,11 @@ def main():
             torch.save(model_to_save.state_dict(), output_model_file)
 
         # 保存所有的损失值
+        logger.info("保存训练过程的loss")
         save_losses(args.model_dir, losses={"loss": losses,
                                             "kg_loss": kg_losses,
                                             "kg_acc": kg_accs})
+        logger.info("训练结束")
     # Load a trained model that you have fine-tuned
 
     if args.do_predict:
