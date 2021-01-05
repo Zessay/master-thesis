@@ -139,6 +139,7 @@ class BERTRetrieval(BertPreTrainedModel):
             kg_acc = kg_acc_num / torch.max(kg_all_num, torch.FloatTensor([1]).cuda())
 
             # 计算关注正确的kg的损失
+            # 这里data['kg_index']是mask类型的向量[batch_size, max_kg_num]，真实使用的知识对应的位置为1
             kg_loss = self.num_choices * torch.mean(
                 labels * torch.sum(-torch.log(torch.clamp(kg_alignment, 1e-12, 1.0)) * data['kg_index'], dim=1) / torch.max(
                     torch.sum(data['kg_index'], dim=1), torch.ones([batch_size], dtype=torch.float32).cuda()))
