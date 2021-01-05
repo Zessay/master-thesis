@@ -13,5 +13,5 @@ python run_BERTRetrieval.py \
 	--cache_dir=/data/results/kdconv/cache/film/bert_ret \
 	--datapath=../../data/film \
 	--num_train_epochs=5.0 \
-	--output_dir=/data/results/kdconv/output/film\bert_ret \
+	--output_dir=/data/results/kdconv/output/film/bert_ret \
   --model_dir=/data/results/kdconv/model/film/bert_ret

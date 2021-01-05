@@ -732,7 +732,7 @@ class MyMemBERTRetrieval(BERTLanguageProcessingBase):
         res["kg_hr_length"] = np.zeros((batch_size, max_kg_num), dtype=int)
         res['kg_hrt_length'] = np.zeros((batch_size, max_kg_num), dtype=int)
         # 每一个知识中h, hr, hrt和预定义最大值相比
-        # 去其中较小值
+        # 取其中较小值
         for i, idx in enumerate(indexes):
             kg_h_length = [min(self._max_know_length, len(sent[0])) for sent in self.data[key]['kg'][idx]]
             res["kg_h_length"][i, :len(kg_h_length)] = kg_h_length
