@@ -16,25 +16,33 @@ from tensorflow.python.layers.core import Dense
 def output_projection_layer(num_units, num_symbols, num_samples=None, name="my_dense"):
     def sampled_sequence_loss(outputs, targets, masks):
         with variable_scope.variable_scope('decoder_rnn/%s' % name):
+            # 这里是解码器隐层到词表维度的映射
             weights = tf.transpose(tf.get_variable("kernel", [num_units, num_symbols]))
             bias = tf.get_variable("bias", [num_symbols])
 
             batch_size = tf.shape(targets)[0]
 
             local_labels = tf.reshape(targets, [-1])
-            local_masks = tf.reshape(masks, [-1])
+            local_masks = tf.reshape(masks, [-1])    # [batch_size * decoder_length, ]
+            # 这里计算每一个位置单词在全量词表上的概率分布 [batch_size, decoder_length, vocab_size]
             local_dis = tf.nn.log_softmax(tf.einsum('aij,kj->aik', outputs, weights) + bias)
             #local_dis = tf.einsum('aij,kj->aik', outputs, weights) + bias
 
+            # [batch_size * decoder_length, vocab_size]
             y_prob = tf.reshape(local_dis, [-1, num_symbols])
+            # [batch_size * decoder_length, vocab_size]
             labels_onehot = tf.one_hot(local_labels, num_symbols)
             labels_onehot = tf.clip_by_value(labels_onehot, 0.0, 1.0)
+            # [batch_size * decoder_length, ]
             local_loss = tf.reduce_sum(-labels_onehot * y_prob, 1) * local_masks
 
+            # 相当于基于词计算损失
             loss = tf.reduce_sum(local_loss)
             total_size = tf.reduce_sum(local_masks)
             total_size += 1e-12 # to avoid division by 0 for all-0 weights
 
+            # 相当于基于语句计算损失
+            # [batch_size, ]
             reshape_loss = tf.reduce_sum(tf.reshape(local_loss, [batch_size, -1]), axis=1)
             reshape_mask = tf.reduce_sum(tf.reshape(local_masks, [batch_size, -1]), axis=1)
 

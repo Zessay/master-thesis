@@ -1,6 +1,7 @@
 import os
 import time
 from collections import Counter
+import logging
 from itertools import chain
 import multiprocessing
 from multiprocessing import Pool
@@ -15,6 +16,9 @@ from cotk._utils.file_utils import get_resource_file_path
 from cotk.dataloader import LanguageProcessingBase, BERTLanguageProcessingBase, SingleTurnDialog
 from cotk.metric import MetricChain, PerplexityMetric, SingleTurnDialogRecorder
 from ..metric import SingleTurnResponseRecorder, BleuCorpusMetric, SingleTurnDistinct
+
+
+logger = logging.getLogger(__file__)
 
 
 class MyLM(SingleTurnDialog):
@@ -87,7 +91,7 @@ class MyLM(SingleTurnDialog):
 
                         i += 1
 
-                    # post一致都是空的
+                    # post一直都是空的
                     origin_data[key]['post'].append([])
                     # resp则是历史对话和当前回复的拼接
                     origin_data[key]['resp'].append(resp_sent)
@@ -133,6 +137,7 @@ class MyLM(SingleTurnDialog):
         left_vocab = list(filter(lambda x: x[1] >= self._min_vocab_times, vocab))
         left_vocab = list(map(lambda x: x[0], left_vocab))
         # 形成最终的词表
+        # 这里前4个单词是 ["<pad>", "<unk>", "<go>", "<eos>"]
         vocab_list = self.ext_vocab + left_vocab
         valid_vocab_len = len(vocab_list)        # int型，表示词表中单词的数量
         valid_vocab_set = set(vocab_list)        # 对词表进行去重
@@ -142,8 +147,8 @@ class MyLM(SingleTurnDialog):
         # 最终的词表
         vocab_list.extend(list(map(lambda x: x[0], left_vocab)))
 
-        print("valid vocab list length = %d" % valid_vocab_len)
-        print("vocab list length = %d" % len(vocab_list))
+        logger.info("valid vocab list length = %d" % valid_vocab_len)
+        logger.info("vocab list length = %d" % len(vocab_list))
 
         # 单词到id的映射
         word2id = {w: i for i, w in enumerate(vocab_list)}

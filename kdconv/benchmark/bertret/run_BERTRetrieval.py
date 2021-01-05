@@ -27,9 +27,9 @@ from utils.cache_helper import try_cache
 from utils.common import seed_everything, save_losses
 from utils.MyMetrics import MyMetrics
 
-logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s - %(message)s',
-                    datefmt = '%m/%d/%Y %H:%M:%S',
-                    level = logging.INFO)
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
+                    datefmt='%m/%d/%Y %H:%M:%S',
+                    level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -108,6 +108,10 @@ def main():
                         help='Directory for data set. Default: resources://OpenSubtitles')
     parser.add_argument("--num_choices", default=10, type=int,
                         help="the number of retrieval options")
+    parser.add_argument("--max_sent_length", default=192, type=int,
+                        help="The max length of the sentence pair.")
+    parser.add_argument("--num_turns", default=8, type=int,
+                        help="The max turn length of the post field.")
 
     parser.add_argument("--do_train", action='store_true', help="Whether to run training.")
     parser.add_argument("--do_predict", action='store_true', help="Whether to run eval on the dev set.")
@@ -154,18 +158,21 @@ def main():
     data_class = MyBERTRetrieval
 
     # 加载数据
-    def load_dataset(file_id, bert_vocab_name, do_lower_case, num_choices):
-        dm = data_class(file_id=file_id, bert_vocab_name=bert_vocab_name, do_lower_case=do_lower_case, num_choices=num_choices)
+    def load_dataset(file_id, bert_vocab_name, do_lower_case, num_choices, max_sent_length, num_turns):
+        dm = data_class(file_id=file_id, bert_vocab_name=bert_vocab_name, do_lower_case=do_lower_case, num_choices=num_choices,
+                        max_sent_length=max_sent_length, num_turns=num_turns)
         return dm
 
     logger.info("模型训练侧加载数据")
     if args.cache:
-        dataManager = try_cache(load_dataset, (args.datapath, args.vocab_file, args.do_lower_case, args.num_choices),
+        dataManager = try_cache(load_dataset,
+                                (args.datapath, args.vocab_file, args.do_lower_case, args.num_choices, args.max_sent_length, args.num_turns),
                                 args.cache_dir,
                                 data_class.__name__)
     else:
         dataManager = load_dataset(file_id=args.datapath, bert_vocab_name=args.vocab_file, do_lower_case=args.do_lower_case,
-                                   num_choices=args.num_choices)
+                                   num_choices=args.num_choices, max_sent_length=args.max_sent_length,
+                                   num_turns=args.num_turns)
 
     if not os.path.exists(os.path.join(args.datapath, 'test_distractors.json')):
         test_distractors = dataManager.data['test']['resp_distractors']

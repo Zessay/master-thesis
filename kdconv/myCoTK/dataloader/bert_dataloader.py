@@ -309,7 +309,7 @@ class MyBERTRetrieval(BERTLanguageProcessingBase):
                 with open(distractor_file, 'w') as f:
                     json.dump(origin_data[key]['resp_distractors'], f, ensure_ascii=False, indent=4)
 
-        logger.info(f"完成数据读取和负采样，共计用时%f，准备构建词表" % (time.time() - begin_time))
+        logger.info(f"完成数据读取和负采样，共计用时%f ms，准备构建词表" % (time.time() - begin_time))
         # 保存BERT词表
         vocab_list = [each for each in self.bert_id2word]
         valid_vocab_len = len(vocab_list)
@@ -612,7 +612,7 @@ class MyMemBERTRetrieval(BERTLanguageProcessingBase):
                 with open(distractor_file, 'w') as f:
                     json.dump(origin_data[key]['resp_distractors'], f, ensure_ascii=False, indent=4)
 
-        logger.info(f"完成数据读取和负采样，共计用时%f，准备构建词表" % (time.time() - begin_time))
+        logger.info(f"完成数据读取和负采样，共计用时%f ms，准备构建词表" % (time.time() - begin_time))
         # 记录单词词表
         vocab_list = [each for each in self.bert_id2word]
         valid_vocab_len = len(vocab_list)
