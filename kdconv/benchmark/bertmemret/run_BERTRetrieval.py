@@ -191,9 +191,9 @@ def main():
     parser.add_argument('--dataset', type=str, default='ChDialogMemBERTRetrieval', help='Dataloader class. Default: OpenSubtitles')
     parser.add_argument('--datapath', type=str, default='resources://OpenSubtitles',
                         help='Directory for data set. Default: resources://OpenSubtitles')
-    parser.add_argument('--wvclass', type=str, default='TencentChinese',
+    parser.add_argument('--wv_class', type=str, default='TencentChinese',
                         help="Wordvector class, none for not using pretrained wordvec. Default: Glove")
-    parser.add_argument('--wvpath', type=str, default='/home/zhengchujie/wordvector/chinese',
+    parser.add_argument('--wv_path', type=str, default='/home/zhengchujie/wordvector/chinese',
                         help="Directory for pretrained wordvector. Default: resources://Glove300d")
     parser.add_argument('--embedding_size', type=int, default=200,
                         help="Directory for pretrained wordvector. Default: resources://Glove300d")
@@ -266,14 +266,14 @@ def main():
                                 data_class.__name__)
         vocab = dataManager.id2know_word
         logger.info("加载词向量文件")
-        embed = try_cache(lambda wv, ez, vl: wordvec_class(wv).load_matrix(ez, vl), (args.wvpath, args.embedding_size, vocab),
+        embed = try_cache(lambda wv, ez, vl: wordvec_class(wv).load_matrix(ez, vl), (args.wv_path, args.embedding_size, vocab),
                           args.cache_dir, wordvec_class.__name__)
     else:
         dataManager = load_dataset(file_id=args.datapath, bert_vocab_name=args.vocab_file, do_lower_case=args.do_lower_case,
                                    num_choices=args.num_choices, max_sent_length=args.max_sent_length,
                                    num_turns=args.num_turns)
         logger.info("加载词向量文件")
-        wv = wordvec_class(args.wvpath)
+        wv = wordvec_class(args.wv_path)
         vocab = dataManager.id2know_word
         embed = wv.load_matrix(args.embedding_size, vocab)
 
