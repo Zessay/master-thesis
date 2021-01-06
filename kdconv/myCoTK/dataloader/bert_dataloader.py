@@ -247,7 +247,7 @@ class MyBERTRetrieval(BERTLanguageProcessingBase):
             distractor_file = os.path.join(self._file_path, '%s_distractors.json' % key)
             # 如果存在当前文件的干扰选项（即负样本）
             if os.path.exists(distractor_file):
-                with open(distractor_file) as f:
+                with open(distractor_file, "r", encoding="utf-8") as f:
                     origin_data[key]['resp_distractors'] = json.load(f)
                 # 将每一句转化为对应的id
                 origin_data[key]['resp_distractors_bert'] = [
@@ -306,7 +306,7 @@ class MyBERTRetrieval(BERTLanguageProcessingBase):
                     origin_data[key]['resp_distractors'].append([origin_data[key]['resp'][k] for k in idxs])
                     origin_data[key]['resp_distractors_bert'].append([origin_data[key]['resp_bert'][k] for k in idxs])
 
-                with open(distractor_file, 'w') as f:
+                with open(distractor_file, 'w', encoding="utf-8") as f:
                     json.dump(origin_data[key]['resp_distractors'], f, ensure_ascii=False, indent=4)
 
         logger.info(f"完成数据读取和负采样，共计用时%f ms，准备构建词表" % (time.time() - begin_time))
@@ -559,7 +559,7 @@ class MyMemBERTRetrieval(BERTLanguageProcessingBase):
 
             distractor_file = os.path.join(self._file_path, '%s_distractors.json' % key)
             if os.path.exists(distractor_file):
-                with open(distractor_file) as f:
+                with open(distractor_file, "r", encoding="utf-8") as f:
                     origin_data[key]['resp_distractors'] = json.load(f)
                 origin_data[key]['resp_distractors_bert'] = [
                     [self.convert_tokens_to_bert_ids(self.tokenize(sent)) for sent in distractors] for distractors in
@@ -609,7 +609,7 @@ class MyMemBERTRetrieval(BERTLanguageProcessingBase):
                     origin_data[key]['resp_distractors'].append([origin_data[key]['resp'][k] for k in idxs])
                     origin_data[key]['resp_distractors_bert'].append([origin_data[key]['resp_bert'][k] for k in idxs])
 
-                with open(distractor_file, 'w') as f:
+                with open(distractor_file, 'w', encoding="utf-8") as f:
                     json.dump(origin_data[key]['resp_distractors'], f, ensure_ascii=False, indent=4)
 
         logger.info(f"完成数据读取和负采样，共计用时%f ms，准备构建词表" % (time.time() - begin_time))
