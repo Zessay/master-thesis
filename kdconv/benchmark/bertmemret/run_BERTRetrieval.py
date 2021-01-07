@@ -135,9 +135,9 @@ class BERTRetrieval(BertPreTrainedModel):
         prob = self.activation(logits.view(-1))
 
         if labels is not None:
-            # 计算选择的知识和实际使用的知识匹配的数量总和
+            # 计算选择的知识和实际使用的知识匹配的数量总和，只考虑一条
             kg_acc_num = torch.sum(torch.sum(data['kg_index'] * kg_max_onehot, dim=1) * labels)
-            # 计算总计使用的知识数量
+            # 计算总计使用的知识数量，也只考虑一条
             kg_all_num = torch.sum(torch.max(data['kg_index'], dim=1)[0] * labels)
             kg_acc = kg_acc_num / torch.max(kg_all_num, torch.FloatTensor([1]).cuda())
 
@@ -283,7 +283,6 @@ def main():
     #dataManager._max_know_length = 100
 
     if args.do_train:
-
         if not args.no_cuda:
             if not "CUDA_VISIBLE_DEVICES" in os.environ:
                 os.environ["CUDA_VISIBLE_DEVICES"] = '0,1'
@@ -368,13 +367,14 @@ def main():
 
         model.train()
         losses = []
-        kg_losses = []
-        kg_accs = []
         for epoch in trange(int(args.num_train_epochs), desc="Epoch"):
             model.zero_grad()
             dataManager.restart(key='train', batch_size=args.train_batch_size)
             data = dataManager.get_next_batch(key='train')
             step = 0
+            loss_value = 0
+            kg_loss_value = 0
+            kg_acc_value = 0
             while data is not None:
                 if n_gpu == 1:
                     preprocess_batch(data, device) # multi-gpu does scattering it-self
@@ -386,6 +386,9 @@ def main():
                     loss = loss.mean() # mean() to average on multi-gpu.
                 if args.gradient_accumulation_steps > 1:
                     loss = loss / args.gradient_accumulation_steps
+                loss_value += loss.cpu().item() * args.gradient_accumulation_steps
+                kg_loss_value += kg_loss.cpu().item()
+                kg_acc_value += kg_acc.cpu().item()
                 loss.backward()
                 if (step + 1) % args.gradient_accumulation_steps == 0:
                     # modify learning rate with special warm up BERT uses
@@ -398,16 +401,16 @@ def main():
 
                     # 每次反向传播之前记录一下当前的指标
                     losses.append(loss.detach().cpu().item())
-                    kg_losses.append(kg_loss.detach().cpu().item())
-                    kg_accs.append(kg_acc.detach().cpu().item())
-
 
 
                 if (step + 1) % 1000 == 0:
                     logger.info("step:{} | loss@{} | kg_loss@{} | kg_acc@{}".format(step + 1,
-                                                                                    loss.cpu().item(),
-                                                                                    kg_loss.cpu().item(),
-                                                                                    kg_acc.cpu().item()))
+                                                                                    loss_value / 1000,
+                                                                                    kg_loss_value / 1000,
+                                                                                    kg_acc_value / 1000))
+                    loss_value = 0
+                    kg_loss_value = 0
+                    kg_acc_value = 0
 
                 step += 1
                 data = dataManager.get_next_batch(key='train')
@@ -422,9 +425,7 @@ def main():
 
         # 保存所有的损失值
         logger.info("保存训练过程的loss")
-        save_losses(args.model_dir, losses={"loss": losses,
-                                            "kg_loss": kg_losses,
-                                            "kg_acc": kg_accs})
+        save_losses(args.model_dir, losses={"loss": losses})
         logger.info("训练结束")
     # Load a trained model that you have fine-tuned
 

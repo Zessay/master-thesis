@@ -295,8 +295,8 @@ def main():
                     losses.append(loss.detach().cpu().item())
 
                 # 记录当前的损失值
-                if (step + 1) % (args.gradient_accumulation_steps * 100) == 0:
-                    logger.info("step: %d, loss: %f" % (step + 1, loss_value))
+                if (step + 1) % 1000 == 0:
+                    logger.info("step: %d, loss: %f" % (step + 1, loss_value / 1000))
                     loss_value = 0
 
                 step += 1
