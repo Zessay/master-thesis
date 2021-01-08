@@ -8,7 +8,7 @@ python run_BERTRetrieval.py \
 	--init_checkpoint=/data/models/ptms/chinese_wwm_pytorch \
 	--name=BERTRetrieval \
 	--num_choices=10 \
-	--predict_batch_size 16 \
+	--predict_batch_size=16 \
 	--cache \
 	--cache_dir=/data/results/kdconv/cache/music/bert_ret \
 	--datapath=../../data/music \

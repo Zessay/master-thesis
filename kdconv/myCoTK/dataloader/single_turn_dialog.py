@@ -1,3 +1,6 @@
+# coding=utf-8
+# @Author: 莫冉
+# @Date: 2021-01-05
 import os
 import time
 from collections import Counter
@@ -24,8 +27,9 @@ logger = logging.getLogger(__file__)
 class MyLM(SingleTurnDialog):
     """
     语言模型
-    train和dev的输入形式为："post"字段为空，"resp"表示每一轮对话句子之间的连接，每一句话之间用"<eos>"连接
-    test的输入形式为："post"字段为上下文语句，"resp"表示当前语句
+    train和dev的输入形式为："post"字段为空，"resp"表示每一轮对话句子之间的连接，以<go>起始，每一句话之间用"<eos>"连接，最后是<eos>
+    test的输入形式为："post"字段为上下文语句，"resp"表示当前语句；post以<go>起始，不同的句子用<eos>连接，但是不以<eos>结尾；
+                    而resp则是以<eos>开头，并以<eos>结尾
     min_vocab_times: int型，表示单词出现的最少次数
     invalid_vocab_times: int型
     """
@@ -221,8 +225,8 @@ class MyLM(SingleTurnDialog):
 class MySeq2Seq(SingleTurnDialog):
     """
     Seq2Seq模型
-    输入为： "post"字段为 turn-1 <eos> <go> turn_2 <eos> <go> ....<eos> <go> last_turn
-            "resp"字段为 回复的语句
+    输入为： "post"字段为 <go> turn_1 <eos> <go> turn_2 <eos> <go> ....<eos> <go> last_turn <eos>
+            "resp"字段为 回复的语句 <go> sent <eos>
     """
     def __init__(self, file_id="../data/film", min_vocab_times=0, num_turns=8,
             max_sent_length=10086, invalid_vocab_times=0):

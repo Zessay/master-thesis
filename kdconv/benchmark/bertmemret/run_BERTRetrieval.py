@@ -437,7 +437,7 @@ def main():
 
         if not args.no_cuda:
             if not "CUDA_VISIBLE_DEVICES" in os.environ:
-                os.environ["CUDA_VISIBLE_DEVICES"] = '2'
+                os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
         device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
         n_gpu = torch.cuda.device_count()
