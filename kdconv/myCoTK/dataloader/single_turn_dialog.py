@@ -399,8 +399,8 @@ class MyMemSeq2Seq(SingleTurnDialog):
     """
     包含知识的Seq2Seq
     输入的数据：
-    "post"字段为 turn-1 <eos> <go> turn_2 <eos> <go> ....<eos> <go> last_turn
-    "resp"字段为 回复的语句
+    "post"字段为 <go> turn_1 <eos> <go> turn_2 <eos> <go> ....<eos> <go> last_turn <eos>
+    "resp"字段为 回复的语句，<go> resp <eos>
     "kg"表示当前这段对话中包含的所有知识，类型为List[Tuple[Tuple[str]]]
     "kg_index"表示当前这轮对话中使用的知识的索引List[int]
     """

@@ -1,3 +1,6 @@
+# coding=utf-8
+# @Author: 莫冉
+# @Date: 2021-01-05
 import tensorflow as tf
 import numpy as np
 from tensorflow.contrib.layers.python.layers import layers
@@ -164,3 +167,31 @@ class MyAttention(tf.contrib.seq2seq.BahdanauAttention):
         else:
             return tf.reduce_sum(
                     attention_v * tf.tanh(keys + processed_query), [2])
+
+
+class MyInferenceHelper(tf.contrib.seq2seq.GreedyEmbeddingHelper):
+    """
+    这个类的主要目的是，在贪心搜索的时候，把每一次输出和知识拼接作为下一次的输入
+    """
+    def __init__(self, embedding, start_tokens, end_token, bias_inputs):
+        super(MyInferenceHelper, self).__init__(
+                        embedding, start_tokens, end_token)
+        self._bias_inputs = bias_inputs
+
+    def initialize(self, name=None):
+        finished = tf.tile([False], [self._batch_size])
+        start_inputs = tf.concat([self._start_inputs, self._bias_inputs], axis=1)
+        return (finished, start_inputs)
+
+    def next_inputs(self, time, outputs, state, sample_ids, name=None):
+        """next_inputs_fn for GreedyEmbeddingHelper."""
+        del time, outputs  # unused by next_inputs_fn
+        finished = tf.equal(sample_ids, self._end_token)
+        all_finished = tf.reduce_all(finished)
+        next_inputs = tf.cond(
+            all_finished,
+            # If we're finished, the next_inputs value doesn't matter
+            lambda: self._start_inputs,
+            lambda: self._embedding_fn(sample_ids))
+        next_inputs = tf.concat([next_inputs, self._bias_inputs], axis=1)
+        return (finished, next_inputs, state)

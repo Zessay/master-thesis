@@ -197,7 +197,6 @@ def main():
 
         seed_everything(args.seed)
 
-        num_train_steps = None
         logger.info("train examples {}".format(len(dataManager.data['train']['resp'])))
         num_train_steps = int(len(dataManager.data['train'][
                                       'resp']) / args.train_batch_size / args.gradient_accumulation_steps * args.num_train_epochs)

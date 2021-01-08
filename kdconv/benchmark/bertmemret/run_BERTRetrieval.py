@@ -285,7 +285,7 @@ def main():
     if args.do_train:
         if not args.no_cuda:
             if not "CUDA_VISIBLE_DEVICES" in os.environ:
-                os.environ["CUDA_VISIBLE_DEVICES"] = '0,1'
+                os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
         device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
         n_gpu = torch.cuda.device_count()
@@ -298,9 +298,6 @@ def main():
         args.train_batch_size = int(args.train_batch_size / args.gradient_accumulation_steps)
 
         seed_everything(args.seed)
-        if n_gpu > 0:
-            torch.cuda.manual_seed_all(args.seed)
-
 
         logger.info("train examples {}".format(len(dataManager.data['train']['resp'])))
         num_train_steps = int(len(dataManager.data['train'][
@@ -381,7 +378,7 @@ def main():
                 else:
                     preprocess_batch(data)
                 loss, kg_loss, kg_acc = model(data, data['labels'])
-                loss = loss + args.lamb * kg_loss
+                # loss = loss + args.lamb * kg_loss
                 if n_gpu > 1:
                     loss = loss.mean() # mean() to average on multi-gpu.
                 if args.gradient_accumulation_steps > 1:
@@ -430,10 +427,8 @@ def main():
     # Load a trained model that you have fine-tuned
 
     if args.do_predict:
-
-        test_distractors = dataManager.data['test']['resp_distractors']
-        with open(os.path.join(args.datapath, 'test_distractors.json'), 'w') as f:
-            json.dump(test_distractors, f, ensure_ascii=False, indent=4)
+        total_epoch = int(args.num_train_epochs)
+        chosen_epoch = 4
 
         if not args.no_cuda:
             if not "CUDA_VISIBLE_DEVICES" in os.environ:
@@ -442,10 +437,11 @@ def main():
         device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
         n_gpu = torch.cuda.device_count()
 
+        random.seed(args.seed)
+
         output_model_file = os.path.join(args.model_dir, "pytorch_model.%d.%d.bin" %
-                                         (int(args.num_train_epochs),
-                                          int(args.num_train_epochs)
-                                          ))
+                                         (total_epoch,
+                                          chosen_epoch))
 
         model_state_dict = torch.load(output_model_file)
         model = BERTRetrieval(num_choices=args.num_choices, bert_config_file=args.bert_config_file, init_embeddings=embed)

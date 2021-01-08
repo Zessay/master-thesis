@@ -289,7 +289,7 @@ class LM(object):
 		# 这里首先获取预定义的指标
 		metric1 = data.get_teacher_forcing_metric()   # 这里主要计算ppl指标
 		metric2 = data.get_inference_metric()         # 这里主要计算bleu和distinct指标
-		data.restart("test", batch_size=args.batch_size * 4, shuffle=False)
+		data.restart("test", batch_size=args.batch_size, shuffle=False)
 		batched_data = data.get_next_batch("test")
 
 		for i in range(2):
