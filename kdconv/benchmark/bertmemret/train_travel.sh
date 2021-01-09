@@ -11,7 +11,7 @@ python run_BERTRetrieval.py \
 	--name=BERTMemRetrieval \
 	--num_choices=10 \
 	--train_batch_size=16 \
-	--learning_rate=5e-5 \
+	--learning_rate=3e-5 \
 	--lamb=0.0 \
 	--cache \
 	--cache_dir=/data/results/kdconv/cache/travel/bert_mem_ret \

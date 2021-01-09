@@ -219,6 +219,7 @@ class LM(object):
 					self.devSummary(self.global_step.eval() // args.checkpoint_steps, {'loss': dev_loss, 'perplexity': np.exp(dev_loss)})
 
 					if np.sum(loss_step) > max(previous_losses):
+						logger.info(f"当前的损失为 {loss_step} | 学习率衰减")
 						sess.run(self.learning_rate_decay_op)
 					# 保存最佳模型
 					if dev_loss < best_valid:
@@ -239,7 +240,7 @@ class LM(object):
 
 	def test_process_hits(self, sess, data, args):
 
-		with open(os.path.join(args.datapath, 'test_distractors.json'), 'r') as f:
+		with open(os.path.join(args.datapath, 'test_distractors.json'), 'r', encoding="utf-8") as f:
 			test_distractors = json.load(f)
 
 		data.restart("test", batch_size=1, shuffle=False)
@@ -342,7 +343,7 @@ class LM(object):
 		res.update(self.test_process_hits(sess, data, args))
 
 		test_file = args.output_dir + "/%s_%s.txt" % (args.name, "test")
-		with open(test_file, 'w') as f:
+		with open(test_file, 'w', encoding="utf-8") as f:
 			print("Test Result:")
 			res_print = list(res.items())
 			res_print.sort(key=lambda x: x[0])

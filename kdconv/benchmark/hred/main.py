@@ -6,11 +6,11 @@ import os
 import logging
 import numpy as np
 import tensorflow as tf
-from myCoTK.dataloader import MySeq2Seq
+from myCoTK.dataloader import MyHRED
 from myCoTK.wordvector import TencentChinese
 from utils import debug, try_cache
 
-from .model import Seq2SeqModel
+from .model import HredModel
 
 logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 def create_model(sess, data, args, embed):
     with tf.variable_scope(args.name):
-        model = Seq2SeqModel(data, args, embed)
+        model = HredModel(data, args, embed)
         model.print_parameters()
         latest_dir = '%s/checkpoint_latest' % args.model_dir
         best_dir = '%s/checkpoint_best' % args.model_dir
@@ -75,8 +75,9 @@ def main(args):
     np.random.seed(args.seed)
     tf.set_random_seed(args.seed)
 
-    data_class = MySeq2Seq
+    data_class = MyHRED
     wordvec_class = TencentChinese
+
     logger.info("模型侧加载数据")
     if args.cache:
         if not os.path.isdir(args.cache_dir):
@@ -87,26 +88,24 @@ def main(args):
                           "num_turns": args.num_turns},
                          args.cache_dir)
         vocab = data.vocab_list
-        logger.info("加载词向量")
+        logger.info("加载词向量文件")
         embed = try_cache(
             lambda wv, ez, vl: wordvec_class(wv).load_matrix(ez, vl),
-            (args.wv_path,
-             args.embedding_size,
-             vocab),
+            (args.wv_path, args.embedding_size, vocab),
             args.cache_dir,
             wordvec_class.__name__)
     else:
         data = data_class(file_id=args.datapath,
-                          num_turns=args.num_turns,
-                          max_sent_length=args.max_sent_length)
+                          max_sent_length=args.max_sent_length,
+                          num_turns=args.num_turns)
         logger.info("定义并加载词向量文件")
         wv = wordvec_class(args.wv_path)
         vocab = data.vocab_list
         embed = wv.load_matrix(args.embedding_size, vocab)
 
     embed = np.array(embed, dtype=np.float32)
-    if not os.path.isdir(args.output_dir):
-        os.mkdir(args.output_dir)
+    if not os.path.isdir(args.out_dir):
+        os.mkdir(args.out_dir)
 
     with tf.Session(config=config) as sess:
         model = create_model(sess, data, args, embed)

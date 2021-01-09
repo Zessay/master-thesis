@@ -2,14 +2,15 @@
 # @Author: 莫冉
 # @Date: 2021-01-08
 import os
+
 import logging
 import numpy as np
 import tensorflow as tf
-from myCoTK.dataloader import MyMemSeq2Seq
+from myCoTK.dataloader import MyMemHRED
 from myCoTK.wordvector import TencentChinese
 from utils import debug, try_cache
 
-from .model import Seq2SeqModel
+from .model import HredModel
 
 logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s - %(message)s',
                     datefmt = '%m/%d/%Y %H:%M:%S',
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 def create_model(sess, data, args, embed):
 	with tf.variable_scope(args.name):
-		model = Seq2SeqModel(data, args, embed)
+		model = HredModel(data, args, embed)
 		model.print_parameters()
 		latest_dir = '%s/checkpoint_latest' % args.model_dir
 		best_dir = '%s/checkpoint_best' % args.model_dir
@@ -30,14 +31,14 @@ def create_model(sess, data, args, embed):
 		if not os.path.isdir(best_dir):
 			os.mkdir(best_dir)
 		if tf.train.get_checkpoint_state(latest_dir, args.name) and args.restore == "last":
-			print("Reading model parameters from %s" % tf.train.latest_checkpoint(latest_dir, args.name))
+			logger.info("Reading model parameters from %s" % tf.train.latest_checkpoint(latest_dir, args.name))
 			model.latest_saver.restore(sess, tf.train.latest_checkpoint(latest_dir, args.name))
 		else:
 			if tf.train.get_checkpoint_state(best_dir, args.name) and args.restore == "best":
-				print('Reading model parameters from %s' % tf.train.latest_checkpoint(best_dir, args.name))
+				logger.info('Reading model parameters from %s' % tf.train.latest_checkpoint(best_dir, args.name))
 				model.best_saver.restore(sess, tf.train.latest_checkpoint(best_dir, args.name))
 			else:
-				print("Created model with fresh parameters.")
+				logger.info("Created model with fresh parameters.")
 				global_variable = [gv for gv in tf.global_variables() if args.name in gv.name]
 				sess.run(tf.variables_initializer(global_variable))
 
@@ -60,7 +61,7 @@ def main(args):
 	np.random.seed(args.seed)
 	tf.set_random_seed(args.seed)
 
-	data_class = MyMemSeq2Seq
+	data_class = MyMemHRED
 	wordvec_class = TencentChinese
 	logger.info("模型侧加载数据")
 	if args.cache:

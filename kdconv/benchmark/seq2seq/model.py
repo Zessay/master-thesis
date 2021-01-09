@@ -5,7 +5,6 @@ import numpy as np
 import tensorflow as tf
 import time
 
-from tensorflow.python.ops.nn import dynamic_rnn
 from utils.output_projection import output_projection_layer, MyDense, MyAttention
 from utils import SummaryHelper
 import jieba
@@ -81,7 +80,7 @@ class Seq2SeqModel(object):
 		with tf.variable_scope('encoder'):
 			# encoder_output: [batch, encoder_len, eh_size]
 			# encoder_state: [batch, eh_size]
-			encoder_output, encoder_state = dynamic_rnn(cell_enc, self.encoder_input,
+			encoder_output, encoder_state = tf.nn.dynamic_rnn(cell_enc, self.encoder_input,
 				self.posts_length, dtype=tf.float32, scope="encoder_rnn")
 
 		# get output projection function
@@ -258,7 +257,7 @@ class Seq2SeqModel(object):
 
 	def test_process_hits(self, sess, data, args):
 
-		with open(os.path.join(args.datapath, 'test_distractors.json'), 'r') as f:
+		with open(os.path.join(args.datapath, 'test_distractors.json'), 'r', encoding="utf-8") as f:
 			test_distractors = json.load(f)
 
 		data.restart("test", batch_size=1, shuffle=False)
@@ -345,7 +344,7 @@ class Seq2SeqModel(object):
 		res.update(self.test_process_hits(sess, data, args))
 
 		test_file = args.out_dir + "/%s_%s.txt" % (args.name, "test")
-		with open(test_file, 'w') as f:
+		with open(test_file, 'w', encoding="utf-8") as f:
 			print("Test Result:")
 			res_print = list(res.items())
 			res_print.sort(key=lambda x: x[0])

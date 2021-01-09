@@ -21,7 +21,10 @@ def try_cache(module, args, cache_dir, name=None):
 		info = None
 		obj = None
 	if info != repr(args):
-		obj = module(*args)
+		if isinstance(args, dict):
+			obj = module(**args)
+		else:
+			obj = module(*args)
 		f = open(fname, "wb")
 		pickle.dump((repr(args), obj), f, -1)
 		f.close()

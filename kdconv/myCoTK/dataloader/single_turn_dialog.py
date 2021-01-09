@@ -20,7 +20,6 @@ from cotk.dataloader import LanguageProcessingBase, BERTLanguageProcessingBase, 
 from cotk.metric import MetricChain, PerplexityMetric, SingleTurnDialogRecorder
 from ..metric import SingleTurnResponseRecorder, BleuCorpusMetric, SingleTurnDistinct
 
-
 logger = logging.getLogger(__file__)
 
 
@@ -193,7 +192,7 @@ class MyLM(SingleTurnDialog):
             length = list(map(len, origin_data[key]['post'] + origin_data[key]['resp']))
             # 当前语句的长度 - 句子最大长度 + 1， 表示截断单词的总长度
             cut_num = np.sum(np.maximum(np.array(length) - self._max_sent_length + 1, 0))
-            print("%s set. invalid rate: %f, unknown rate: %f, max length before cut: %d, cut word rate: %f" % \
+            logger.info("%s set. invalid rate: %f, unknown rate: %f, max length before cut: %d, cut word rate: %f" % \
                   (key, invalid_num / vocab_num, oov_num / vocab_num, max(length), cut_num / vocab_num))
 
         return vocab_list, valid_vocab_len, data, data_size
@@ -307,8 +306,8 @@ class MySeq2Seq(SingleTurnDialog):
         left_vocab = list(filter(lambda x: x[1] >= self._invalid_vocab_times and x[0] not in valid_vocab_set, vocab))
         vocab_list.extend(list(map(lambda x: x[0], left_vocab)))
 
-        print("valid vocab list length = %d" % valid_vocab_len)
-        print("vocab list length = %d" % len(vocab_list))
+        logger.info("valid vocab list length = %d" % valid_vocab_len)
+        logger.info("vocab list length = %d" % len(vocab_list))
 
         # 单词到索引的映射
         word2id = {w: i for i, w in enumerate(vocab_list)}
@@ -337,7 +336,7 @@ class MySeq2Seq(SingleTurnDialog):
             length = list(map(len, origin_data[key]['post'] + origin_data[key]['resp']))
             # 计算需要截断单词的和
             cut_num = np.sum(np.maximum(np.array(length) - self._max_sent_length + 1, 0))
-            print("%s set. invalid rate: %f, unknown rate: %f, max length before cut: %d, cut word rate: %f" %
+            logger.info("%s set. invalid rate: %f, unknown rate: %f, max length before cut: %d, cut word rate: %f" %
                   (key, invalid_num / vocab_num, oov_num / vocab_num, max(length), cut_num / vocab_num))
 
         return vocab_list, valid_vocab_len, data, data_size
@@ -484,8 +483,8 @@ class MyMemSeq2Seq(SingleTurnDialog):
         left_vocab = list(filter(lambda x: x[1] >= self._invalid_vocab_times and x[0] not in valid_vocab_set, vocab))
         vocab_list.extend(list(map(lambda x: x[0], left_vocab)))
 
-        print("valid vocab list length = %d" % valid_vocab_len)
-        print("vocab list length = %d" % len(vocab_list))
+        logger.info("valid vocab list length = %d" % valid_vocab_len)
+        logger.info("vocab list length = %d" % len(vocab_list))
 
         # 单词到id的索引
         word2id = {w: i for i, w in enumerate(vocab_list)}

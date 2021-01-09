@@ -1,20 +1,17 @@
-import os
-import time
-from collections import Counter
-from itertools import chain
-import multiprocessing
-from multiprocessing import Pool
-import tqdm
-
+# coding=utf-8
+# @Author: 莫冉
+# @Date: 2021-01-04
 import jieba
 import json
-
+import logging
 import numpy as np
 
 from cotk._utils.file_utils import get_resource_file_path
 from cotk.dataloader import LanguageProcessingBase, BERTLanguageProcessingBase, MultiTurnDialog
 from cotk.metric import MetricChain, PerplexityMetric, SingleTurnDialogRecorder
 from ..metric import SingleTurnResponseRecorder, BleuCorpusMetric, SingleTurnDistinct
+
+logger = logging.getLogger(__file__)
 
 
 class MyHRED(MultiTurnDialog):
@@ -50,7 +47,7 @@ class MyHRED(MultiTurnDialog):
                     turn.append(sent)
                     # 统计句子中单词出现的次数
                     count_token(sent)
-                    # 统计知识出现的次数
+                    # 统计知识中的单词
                     if 'attrs' in message:
                         for attr in message['attrs']:
                             h = jieba.lcut(attr['name'].replace('【', '').replace('】', ''))
@@ -82,8 +79,8 @@ class MyHRED(MultiTurnDialog):
                 lambda x: x[1] >= self._invalid_vocab_times and x[0] not in valid_vocab_set, vocab))
         vocab_list.extend(list(map(lambda x: x[0], left_vocab)))
 
-        print("valid vocab list length = %d" % valid_vocab_len)
-        print("vocab list length = %d" % len(vocab_list))
+        logger.info("valid vocab list length = %d" % valid_vocab_len)
+        logger.info("vocab list length = %d" % len(vocab_list))
 
         word2id = {w: i for i, w in enumerate(vocab_list)}
         line2id = lambda line: ([self.go_id] + list(map(lambda word: word2id.get(word, self.unk_id), line)) + \
@@ -209,6 +206,11 @@ class MyHRED(MultiTurnDialog):
 
 
 class MyMemHRED(MultiTurnDialog):
+    """
+    posts: <go> turn_1 <eos> <go> turn_2 <eos>
+    prev_post: <go> sent <eos>
+    resp: <go> resp <eos>
+    """
     def __init__(self, file_id="../data/film", min_vocab_times=0, max_sent_length=10086, invalid_vocab_times=0,
                  num_turns=8, max_know_length=100):
         self._file_id = file_id
@@ -262,10 +264,15 @@ class MyMemHRED(MultiTurnDialog):
 
                 # 将一组对话中的所有元素作为
                 for i in range(len(turn) - 1):
+                    # post表示前num_turns-1轮的历史对话，
+                    # 应该是List[List[str]]，其中每一个str表示分词之后的单词
                     posts = [turn[j] for j in range(max(0, (i + 1) - (self._num_turns - 1)), i + 1)]
+                    # prev_post表示最近一轮的对话，List[str]
                     prev_post = posts[-1]
+                    # response表示对于当前问题的回复
                     response = turn[i + 1]
 
+                    # 得到当前对话的post，response以及kg
                     origin_data[key]['posts'].append(posts)
                     origin_data[key]['prev_posts'].append(prev_post)
                     origin_data[key]['responses'].append(response)
@@ -282,8 +289,8 @@ class MyMemHRED(MultiTurnDialog):
         left_vocab = list(filter(lambda x: x[1] >= self._invalid_vocab_times and x[0] not in valid_vocab_set, vocab))
         vocab_list.extend(list(map(lambda x: x[0], left_vocab)))
 
-        print("valid vocab list length = %d" % valid_vocab_len)
-        print("vocab list length = %d" % len(vocab_list))
+        logger.info("valid vocab list length = %d" % valid_vocab_len)
+        logger.info("vocab list length = %d" % len(vocab_list))
 
         word2id = {w: i for i, w in enumerate(vocab_list)}
         line2id = lambda line: ([self.go_id] + list(map(lambda word: word2id.get(word, self.unk_id), line)) + \
@@ -331,6 +338,7 @@ class MyMemHRED(MultiTurnDialog):
         # 统计最大的轮次长度
         res['context_length'] = [len(self.data[key]['posts'][idx]) for idx in indexes]
         max_context_length = max(res['context_length'])
+        # 统计context中每一句话的长度 [batch_size * (num_turns -1)]
         res['posts_length'] = np.zeros((batch_size * max_context_length), dtype=int)
         for i, idx in enumerate(indexes):
             posts_length = [len(each) for each in self.data[key]['posts'][idx]]
@@ -338,14 +346,19 @@ class MyMemHRED(MultiTurnDialog):
 
         max_posts_length = np.max(res['posts_length'])
         # 得到上下文单词
+        # 维度为 [batch*num_turns, max_post_length]
+        # 如果对应为空，则为全0
+        # 这里采用的是后padding，也就是说轮次不足最大的，其后面的为全0
         res['posts'] = np.zeros((batch_size * max_context_length, max_posts_length), dtype=int)
         for i, idx in enumerate(indexes):
             for j in range(res['context_length'][i]):
                 post = self.data[key]['posts'][idx][j]
                 res['posts'][i * max_context_length + j, :len(post)] = post
 
+        # [batch, ]
         res['prev_posts_length'] = [len(self.data[key]['posts'][idx][-1]) for idx in indexes]
         max_prev_posts_length = max(res['prev_posts_length'])
+        # [batch, max_prev_post_length]
         res['prev_posts'] = np.zeros((batch_size, max_prev_posts_length), dtype=int)
         for i, idx in enumerate(indexes):
             prev_post = self.data[key]['posts'][idx][-1]
@@ -388,6 +401,7 @@ class MyMemHRED(MultiTurnDialog):
                 sent = (tri[0] + tri[1] + tri[2])[:self._max_know_length]
                 res['kg'][i, j, :len(sent)] = sent
 
+        # [batch_size, max_kg_num]，有效的知识对应的位置为1
         res['kg_index'] = np.zeros((batch_size, max_kg_num), dtype=float)
         for i, idx in enumerate(indexes):
             for kgid in self.data[key]['kg_index'][idx]:
