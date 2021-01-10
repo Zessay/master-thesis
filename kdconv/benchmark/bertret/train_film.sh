@@ -9,8 +9,10 @@ python run_BERTRetrieval.py \
 	--init_checkpoint=/data/models/ptms/chinese_wwm_pytorch/pytorch_model.bin \
 	--name=BERTRetrieval \
 	--num_choices=10 \
+	--max_sent_length=256 \
+	--num_turns=8 \
 	--train_batch_size=16 \
-	--learning_rate=5e-5 \
+	--learning_rate=3e-5 \
 	--cache \
 	--cache_dir=/data/results/kdconv/cache/film/bert_ret \
 	--datapath=../../data/film \

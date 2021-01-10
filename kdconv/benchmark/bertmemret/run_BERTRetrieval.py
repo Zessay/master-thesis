@@ -205,6 +205,8 @@ def main():
                         help="the number of retrieval options")
     parser.add_argument("--max_sent_length", default=192, type=int,
                         help="The max length of the sentence pair.")
+    parser.add_argument("--max_know_length", default=100, type=int,
+                        help="The max length of the knowledge triplets")
     parser.add_argument("--num_turns", default=8, type=int,
                         help="The max turn length of the post field.")
 
@@ -254,9 +256,9 @@ def main():
     wordvec_class = TencentChinese
 
     # 加载数据
-    def load_dataset(file_id, bert_vocab_name, do_lower_case, num_choices, max_sent_length, num_turns):
+    def load_dataset(file_id, bert_vocab_name, do_lower_case, num_choices, max_sent_length, max_know_length, num_turns):
         dm = data_class(file_id=file_id, bert_vocab_name=bert_vocab_name, do_lower_case=do_lower_case, num_choices=num_choices,
-                        max_sent_length=max_sent_length, num_turns=num_turns)
+                        max_sent_length=max_sent_length, max_know_length=max_know_length, num_turns=num_turns)
         return dm
 
     logger.info("模型训练侧加载数据")
@@ -264,7 +266,10 @@ def main():
         if not os.path.isdir(args.cache_dir):
             os.mkdir(args.cache_dir)
         dataManager = try_cache(load_dataset,
-                                (args.datapath, args.vocab_file, args.do_lower_case, args.num_choices, args.max_sent_length, args.num_turns),
+                                {"file_id": args.datapath, "bert_vocab_name": args.vocab_file,
+                                 "do_lower_case": args.do_lower_case, "num_choices": args.num_choices,
+                                 "max_sent_length": args.max_sent_length, "max_know_length": args.max_know_length,
+                                 "num_turns": args.num_turns},
                                 args.cache_dir,
                                 data_class.__name__)
         vocab = dataManager.id2know_word
@@ -274,7 +279,7 @@ def main():
     else:
         dataManager = load_dataset(file_id=args.datapath, bert_vocab_name=args.vocab_file, do_lower_case=args.do_lower_case,
                                    num_choices=args.num_choices, max_sent_length=args.max_sent_length,
-                                   num_turns=args.num_turns)
+                                   max_know_length=args.max_know_length, num_turns=args.num_turns)
         logger.info("加载词向量文件")
         wv = wordvec_class(args.wv_path)
         vocab = dataManager.id2know_word

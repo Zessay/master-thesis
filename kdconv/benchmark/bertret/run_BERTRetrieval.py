@@ -166,7 +166,9 @@ def main():
     logger.info("模型训练侧加载数据")
     if args.cache:
         dataManager = try_cache(load_dataset,
-                                (args.datapath, args.vocab_file, args.do_lower_case, args.num_choices, args.max_sent_length, args.num_turns),
+                                {"file_id": args.datapath, "bert_vocab_name": args.vocab_file,
+                                 "do_lower_case": args.do_lower_case, "num_choices": args.num_choices,
+                                 "max_sent_length": args.max_sent_length, "num_turns": args.num_turns},
                                 args.cache_dir,
                                 data_class.__name__)
     else:

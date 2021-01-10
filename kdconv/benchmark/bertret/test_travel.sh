@@ -8,6 +8,8 @@ python run_BERTRetrieval.py \
 	--init_checkpoint=/data/models/ptms/chinese_wwm_pytorch \
 	--name=BERTRetrieval \
 	--num_choices=10 \
+	--max_sent_length=256 \
+	--num_turns=8 \
 	--predict_batch_size=16 \
 	--cache \
 	--cache_dir=/data/results/kdconv/cache/travel/bert_ret \

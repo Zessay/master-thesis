@@ -10,6 +10,9 @@ python run_BERTRetrieval.py \
 	--wv_path=/data/models/wordvector/chinese \
 	--name=BERTMemRetrieval \
 	--num_choices=10 \
+	--max_sent_length=256 \
+	--max_know_length=128 \
+	--num_turns=8 \
 	--predict_batch_size=8 \
 	--cache \
 	--cache_dir=/data/results/kdconv/cache/music/bert_mem_ret \
