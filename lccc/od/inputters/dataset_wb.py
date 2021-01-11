@@ -39,9 +39,10 @@ class WBDataset(Dataset):
         bos, eos, speaker1, speaker2 = self.tokenizer.convert_tokens_to_ids(SPECIAL_TOKENS)
 
         # 在输入序列前面加上[bos]标记对应的id，在response后面加上[eos]对应的id
+        # 这里的
         sequence = [[bos]] + history + [response + ([eos] if with_eos else [])]
         # 添加说话人角色对应的id
-        # 在每句话前面添加对华人的角色
+        # 在每句话前面添加对话人的角色
         sequence = [sequence[0]] + [[speaker2 if i % 2 else speaker1] + s
                                     for i, s in enumerate(sequence[1:])]
         # 组织输入

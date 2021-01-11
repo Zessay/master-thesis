@@ -60,7 +60,7 @@ class BERTRetrieval(BertPreTrainedModel):
         self.embed = nn.Embedding.from_pretrained(torch.FloatTensor(init_embeddings), freeze=False)
 
         #self.classifier = nn.Linear(self.bert_config.hidden_size + self.embed_size, 1)
-        self.classifier = nn.Linear(self.bert_config.hidden_size, 1)
+        self.classifier = nn.Linear(2 * self.bert_config.hidden_size, 1)
         self.reshape = nn.Linear(self.bert_config.hidden_size, self.embed_size, bias=False)
         self.reshape_know = nn.Linear(self.embed_size, self.bert_config.hidden_size, bias=True)
         self.relu = nn.ReLU()
@@ -131,7 +131,8 @@ class BERTRetrieval(BertPreTrainedModel):
         # [batch_size, bert_hidden_size]
         relu_know = self.relu(self.reshape_know(knowledge_embed))
         # 经过分类器分类，并转化为概率
-        logits = self.classifier(pair_output + relu_know)
+        logits = self.classifier(torch.cat([pair_output, relu_know], dim=-1))
+        # logits = self.classifier(pair_output + relu_know)
         prob = self.activation(logits.view(-1))
 
         if labels is not None:
