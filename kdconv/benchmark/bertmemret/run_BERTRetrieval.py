@@ -19,6 +19,7 @@ import torch
 from torch import nn
 from transformers import BertPreTrainedModel, BertModel, BertConfig
 from transformers import AdamW
+from transformers.activations import ACT2FN
 
 from myCoTK.dataloader import MyMemBERTRetrieval
 from myCoTK.wordvector import TencentChinese
@@ -63,7 +64,7 @@ class BERTRetrieval(BertPreTrainedModel):
         self.classifier = nn.Linear(2 * self.bert_config.hidden_size, 1)
         self.reshape = nn.Linear(self.bert_config.hidden_size, self.embed_size, bias=False)
         self.reshape_know = nn.Linear(self.embed_size, self.bert_config.hidden_size, bias=True)
-        self.relu = nn.ReLU()
+        self.know_activation = ACT2FN["gelu"]
         self.softmax = nn.Softmax(dim=-1)
         self.activation = nn.Sigmoid()
 
@@ -129,7 +130,7 @@ class BERTRetrieval(BertPreTrainedModel):
         knowledge_embed = torch.sum(kg_alignment.unsqueeze(-1) * kg_value_avg, dim=1)
         # 将知识的表征embed_dim重新映射到BERT的表征维度 bert_hidden_size
         # [batch_size, bert_hidden_size]
-        relu_know = self.relu(self.reshape_know(knowledge_embed))
+        relu_know = self.know_activation(self.reshape_know(knowledge_embed))
         # 经过分类器分类，并转化为概率
         logits = self.classifier(torch.cat([pair_output, relu_know], dim=-1))
         # logits = self.classifier(pair_output + relu_know)
