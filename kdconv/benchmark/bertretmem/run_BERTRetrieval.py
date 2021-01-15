@@ -113,7 +113,7 @@ class BERTRetrieval(BertPreTrainedModel):
         # [B, max_kg_num]
         kg_alignment = intermediate.bmm(kg_hrt_avg.transpose(1,2)).squeeze(dim=1) + self.bias
         kg_mask = (data["kg_hrt_length"] > 0).to(torch.bool)
-        kg_alignment = masked_softmax(kg_alignment, kg_mask, dim=-1)
+        kg_alignment = masked_softmax(kg_alignment, kg_mask, dim=-1, memory_efficient=True)
 
         # 对知识表征加权, [batch, embed_dim]
         knowledge_embed = kg_alignment.unsqueeze(dim=1).bmm(kg_hrt_avg).squeeze(dim=1)
