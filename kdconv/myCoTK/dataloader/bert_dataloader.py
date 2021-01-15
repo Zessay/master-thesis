@@ -236,7 +236,7 @@ class MyBERTRetrieval(BERTLanguageProcessingBase):
                     corpus_post.append(corpus_post_sent)
 
                     # 将当前回复的上文和当前回复拼接起来，限制上文的最大轮次
-                    post_sent = (post_sent + [nxt_sent])[- self.num_turns + 1:]
+                    post_sent = (post_sent + [nxt_sent])[-self.num_turns + 1:]
                     corpus_post_sent = corpus_post_sent + [sentence]
 
                     i += 1
@@ -310,7 +310,7 @@ class MyBERTRetrieval(BERTLanguageProcessingBase):
                 with open(distractor_file, 'w', encoding="utf-8") as f:
                     json.dump(origin_data[key]['resp_distractors'], f, ensure_ascii=False, indent=4)
 
-        logger.info(f"完成数据读取和负采样，共计用时%f ms，准备构建词表" % (time.time() - begin_time))
+        logger.info(f"完成数据读取和负采样，共计用时%f s，准备构建词表" % (time.time() - begin_time))
         # 保存BERT词表
         vocab_list = [each for each in self.bert_id2word]
         valid_vocab_len = len(vocab_list)
@@ -525,7 +525,7 @@ class MyMemBERTRetrieval(BERTLanguageProcessingBase):
                 i = 0
                 post_sent = []
                 corpus_post_sent = []
-                while i + 1 < len(messages):
+                while (i + 1) < len(messages):
                     # 如果是第一句话
                     if i == 0:
                         # 将当前语句转换成bert词表中单词的id
@@ -615,7 +615,7 @@ class MyMemBERTRetrieval(BERTLanguageProcessingBase):
                 with open(distractor_file, 'w', encoding="utf-8") as f:
                     json.dump(origin_data[key]['resp_distractors'], f, ensure_ascii=False, indent=4)
 
-        logger.info(f"完成数据读取和负采样，共计用时%f ms，准备构建词表" % (time.time() - begin_time))
+        logger.info(f"完成数据读取和负采样，共计用时%f s，准备构建词表" % (time.time() - begin_time))
         # 记录单词词表
         vocab_list = [each for each in self.bert_id2word]
         valid_vocab_len = len(vocab_list)
@@ -763,7 +763,6 @@ class MyMemBERTRetrieval(BERTLanguageProcessingBase):
         for k in ['kg_h_length', 'kg_hr_length', 'kg_hrt_length', 'kg', 'kg_index']:
             res[k] = res[k].repeat(self.num_choices, 0)
 
-
         return res
 
     def get_inference_metric(self, gen_key="gen"):
@@ -839,25 +838,26 @@ class GPTGen(BERTLanguageProcessingBase):
             datas = json.load(open(f"{self._file_path}/{key}.json", "r", encoding="utf-8"))
             for data in datas:
                 messages = data["messages"]
-                turn = []  # 保存当前一段所有对话
+                turns = []  # 保存当前一段所有对话
                 for message in messages:
                     # 对当前语句进行分词
                     sent = self.tokenize(message["message"])
-                    turn.append(sent)
+                    turns.append(sent)
 
                 # 得到一段对话的所有语句之后，就可以得到该轮对话的所有训练样本
-                for i in range(len(turn) - 1):
+                for i in range(len(turns) - 1):
                     # 保存一个样本以及对应的回复
                     # 这里获取回复对应的历史对话
                     posts = []
-                    for j in range(max(0, (i+1) - (self.num_turns-1)), i+1):
+                    cur_speaker = self.speakers_id[0]
+                    for j in range(max(0, (i+1)-(self.num_turns-1)), i+1):
                         cur_speaker = self.speakers_id[0] if j % 2 == 0 else self.speakers_id[1]
-                        posts.append([cur_speaker] + self.convert_tokens_to_bert_ids(turn[j]))
+                        posts.append([cur_speaker] + self.convert_tokens_to_bert_ids(turns[j]))
                     prev_post = posts[-1]
                     # 获取回复对应的说话人id
                     next_speaker = self.speakers_id[0] if cur_speaker == self.speakers_id[1] else self.speakers_id[1]
-                    response = [next_speaker] + self.convert_tokens_to_bert_ids(turn[i+1])
-                    origin_response = turn[i+1]
+                    response = [next_speaker] + self.convert_tokens_to_bert_ids(turns[i+1])
+                    origin_response = turns[i+1]
 
                     origin_data[key]["posts"].append(posts)
                     origin_data[key]["prev_posts"].append(prev_post)
@@ -1046,4 +1046,283 @@ class GPTGen(BERTLanguageProcessingBase):
         metric.add_metric(SingleTurnResponseRecorder(self, gen_key=gen_key))
         metric.add_metric(SingleTurnDistinct(self, gen_key=gen_key))
         return metric
+
+# ----------------------------------------------------------------------
+
+class GPTGenKA(GPTGen):
+    """基于知识注意力机制的GPT生成模型"""
+    def __init__(self, file_id: str,
+                 vocab_name: str,
+                 do_lower_case: bool = True,
+                 max_sent_length: int = 256,
+                 max_know_length: int = 128,
+                 num_turns: int = 8,
+                 is_relative: bool = True,
+                 ext_vocab: Optional[List[str]] = None,
+                 key_name: Optional[List[str]] = None,
+                 cpu_count: Optional[int] = None):
+        """
+        用于GPT模型的数据读取类
+        由于GPT的token_type_ids是基于词向量的embedding进行映射的，所以可以直接使用到vocab_size的大小
+        file_id: str，表示数据所在的文件夹路径
+        key_name: List[str]，默认为["train", "dev", "test"]
+        """
+        super().__init__(file_id, vocab_name, do_lower_case,
+                         max_sent_length, num_turns, is_relative,
+                         ext_vocab, key_name, cpu_count)
+        self._max_know_length = max_know_length
+
+
+    def _load_data(self):
+        logger.info("开始读取和处理数据")
+        begin_time = time.time()
+        origin_data = {}
+        vocab = {}
+
+        def count_token(tokens):
+            # 统计列表中所有词出现的次数
+            for token in tokens:
+                vocab[token] = vocab[token] + 1 if token in vocab else 1
+
+        for key in self.key_name:
+            origin_data[key] = {"posts": [], "prev_posts": [], "responses": [], "origin_responses": [],
+                                "kg_index": [], "kg": []}
+            datas = json.load(open("%s/%s.json" % (self._file_path, key), "r", encoding="utf-8"))
+
+            logger.info(f"当前正在处理 {key} 的数据，数据量为{len(datas)}")
+            # 对于每一段对话
+            for data in datas:
+                # 获取当前对话的内容
+                messages = data["messages"]
+                kg = []       # 保存当前对话的所有知识
+                kg_index = []
+                kg_dict = {}
+                turns = []    # 保存当前对话的所有内容
+                for message in messages:
+                    kg_index.append([])
+                    # 对当前语句进行分词
+                    sent = self.tokenize(message["message"])
+                    turns.append(sent)
+                    if "attrs" in message:
+                        for attr in message["attrs"]:
+                            h = jieba.lcut(attr["name"])
+                            r = jieba.lcut(attr["attrname"])
+                            t = jieba.lcut(attr["attrvalue"])
+                            # 一个三元组构成知识
+                            k = tuple((tuple(h), tuple(r), tuple(t)))
+                            # 如果当前的知识没有在字典中出现过，则添加到字典中
+                            if k not in kg_dict:
+                                kg_dict[k] = len(kg)
+                                kg.append(k)
+                            kg_index[-1].append(kg_dict[k])
+                            count_token(h + r + t)
+
+                # 得到一段对话的所有语句之后，就可以得到该轮对话的所有训练样本
+                for i in range(len(turns) - 1):
+                    posts = []
+                    cur_speaker = self.speakers_id[0]
+                    for j in range(max(0, (i+1)-(self.num_turns-1)), i+1):
+                        cur_speaker = self.speakers_id[0] if j % 2 == 0 else self.speakers_id[1]
+                        posts.append([cur_speaker] + [self.convert_tokens_to_bert_ids(turns[j])])
+                    prev_posts = posts[-1]
+                    # 获取回复对应的对话人id
+                    next_speaker = self.speakers_id[0] if cur_speaker == self.speakers_id[1] else self.speakers_id[1]
+                    response = [next_speaker] + self.convert_tokens_to_bert_ids(turns[i+1])
+                    origin_response = turns[i+1]
+
+                    origin_data[key]["posts"].append(posts)
+                    origin_data[key]["prev_posts"].append(prev_posts)
+                    origin_data[key]["responses"].append(response)
+                    origin_data[key]["origin_responses"].append(origin_response)
+                    # 保存当前对话中所有的知识
+                    origin_data[key]["kg"].append(kg)
+                    origin_data[key]["kg_index"].append(kg_index[i+1])  # 当前回复所使用的知识索引
+
+        logger.info(f"完成数据读取，共计用时{time.time()-begin_time} s，准备构建词表")
+        # 这里保存的是bert单词词表
+        vocab_list = [each for each in self.bert_id2word]
+        valid_vocab_len = len(vocab_list)
+        logger.info(f"词表数量为 {len(vocab_list)}")
+
+        # 知识库中的单词按照从高到低排序
+        vocab = sorted(list(vocab.items()), key=lambda pair: (-pair[1], pair[0]))
+        self.id2know_word = list(map(lambda x: x[0], vocab))
+        self.know_word2id = {w:i for i, w in enumerate(self.id2know_word)}
+        logger.info(f"知识库词表的长度：{len(self.id2know_word)}")
+
+        know2id = lambda line: list(map(lambda word: self.know_word2id.get(word, self.unk_id), line))
+        knows2id = lambda lines: list(map(know2id, lines))
+        # 将知识库中的单词转换为知识库词表中单词对应的索引
+        for key in self.key_name:
+            origin_data[key]["kg"] = [list(map(knows2id, kg)) for kg in origin_data[key]["kg"]]
+
+        # 计算train, dev, test每一组数据集的大小
+        data_size = {key: len(origin_data[key]["responses"]) for key in self.key_name}
+        print("数据集统计：", data_size)
+        return vocab_list, valid_vocab_len, origin_data, data_size
+
+
+    def get_batch(self, key, indexes):
+        if key not in self.key_name:
+            raise ValueError("No set named %s." % key)
+
+        batch_size = len(indexes)
+        res = {
+            "resp": [self.data[key]["origin_responses"][i] for i in indexes],  # 表示回复的原文本
+            "resp_lens": [len(self.data[key]["origin_responses"][i]) for i in indexes],  # 表示回复原文本的长度
+            "posts_lens": None,
+            "input_ids": None,
+            "input_mask": None,
+            "token_type_ids": None,
+            "turn_ids": None,
+            "lm_labels": None
+        }
+
+        all_input_ids, all_input_mask, all_token_type_ids, all_turn_ids, all_lm_labels = [], [], [], [], []
+        posts_lens = []
+
+        for iidx, idx in enumerate(indexes):
+            # 获取上下文的语句和当前回复语句
+            # 这里的语句都已经转化为了id的形式
+            # 并且每个语句的第一个token都表示对话人的标识
+            posts = self.data[key]["posts"][idx]
+            response = self.data[key]["responses"][idx]
+
+            # 计算当前response的长度
+            resp_len = len(response)
+            # 如果当前的回复长度大于允许的最大长度
+            # 由于头尾有[CLS]和[SEP]
+            if resp_len > self._max_sent_length - 2:
+                response = response[:self._max_sent_length-2]
+                allow_max_length = 0
+            else:
+                allow_max_length = self._max_sent_length - 2 - resp_len
+            # 对posts的长度进行裁剪
+            posts = self.trim_posts(posts, allow_max_length)
+
+            # 获取token_type_ids
+            resp_token_type_ids = self.get_token_type_ids(response)
+            posts_token_type_ids = []
+            for post in posts:
+                posts_token_type_ids.append(self.get_token_type_ids(post))
+
+            # 获取turn_ids
+            if self.is_relative:
+                posts_turns, resp_turns = self.get_relative_turns(posts, response)
+            else:
+                posts_turns, resp_turns = self.get_absolute_turns(posts, response)
+
+
+            # 首先将上面所有的post转化为列表形式
+            posts_input = list(chain(*posts))
+            posts_token_type_ids = list(chain(*posts_token_type_ids))
+            posts_turns = list(chain(*posts_turns))
+            if key != "test":
+                # 转化为GPT2的输入
+                posts_len = len(posts_input) + 1   # 包含go_id
+                input_ids = [self.bert_go_id] + posts_input + response + [self.bert_eos_id]
+                token_type_ids = [self.bert_go_id] + posts_token_type_ids + resp_token_type_ids + [self.bert_eos_id]
+                turn_ids = [posts_turns[0]] + posts_turns + resp_turns + [resp_turns[-1]]
+                input_mask = [1] * len(input_ids)
+
+                # 获取对应的单词标签
+                # 在GPT内部计算loss的时候有shift的操作，所以这里只需要逐一对齐即可
+                lm_labels = [-1] * posts_len + [-1] + response[1:] + [self.bert_eos_id]
+
+                assert len(input_ids) == len(turn_ids)
+                assert len(input_ids) == len(lm_labels)
+
+                padding = [0] * (self._max_sent_length - len(input_ids))
+                input_ids = input_ids + padding
+                token_type_ids = token_type_ids + padding
+                turn_ids = turn_ids + padding
+                input_mask = input_mask + padding
+                lm_labels = lm_labels + [-1] * len(padding)
+
+
+                all_input_ids.append(input_ids)
+                all_token_type_ids.append(token_type_ids)
+                all_turn_ids.append(turn_ids)
+                all_input_mask.append(input_mask)
+                all_lm_labels.append(lm_labels)
+                posts_lens.append(posts_len)
+            else:
+                # 预测时的输入是不包含response的
+                # 对预测输入的封装不进行padding
+                posts_len = len(posts_input) + 1
+                input_ids = [self.bert_go_id] + posts_input + [response[0]]  # 这里相当于是用于生成response的起始符
+                token_type_ids = [self.bert_go_id] + posts_token_type_ids + [resp_token_type_ids[0]]
+                turn_ids = [posts_turns[0]] + posts_turns + [resp_turns[0]]
+
+                assert len(input_ids) == len(turn_ids)
+
+                all_input_ids.append(input_ids)
+                all_token_type_ids.append(token_type_ids)
+                all_turn_ids.append(turn_ids)
+                posts_lens.append(posts_len)
+
+        # 将当前输入保存到词典中
+        res["input_ids"] = all_input_ids
+        res["input_mask"] = all_input_mask
+        res["token_type_ids"] = all_token_type_ids
+        res["turn_ids"] = all_turn_ids
+        res["lm_labels"] = all_lm_labels
+        res["posts_lens"] = posts_lens
+
+        # 计算当前batch中每一句话中kg最多的数量
+        max_kg_num = max([len(self.data[key]['kg'][idx]) for idx in indexes])
+        # batch_size * mag_kg_num
+        res["kg_h_length"] = np.zeros((batch_size, max_kg_num), dtype=int)
+        res["kg_hr_length"] = np.zeros((batch_size, max_kg_num), dtype=int)
+        res["kg_hrt_length"] = np.zeros((batch_size, max_kg_num), dtype=int)
+        # 每一组知识中的h, hr, hrt和预定义的最大值相比
+        # 取其中较小值
+        for i, idx in enumerate(indexes):
+            kg_h_length = [min(self._max_know_length, len(sent[0])) for sent in self.data[key]["kg"][idx]]
+            res["kg_h_length"][i, :len(kg_h_length)] = kg_h_length
+            kg_hr_length = [min(self._max_know_length, len(sent[0])+len(sent[1])) for sent in self.data[key]["kg"][idx]]
+            res["kg_hr_length"][i, :len(kg_hr_length)] = kg_hr_length
+            kg_hrt_length = [min(self._max_know_length, len(sent[0])+len(sent[1])+len(sent[2]))
+                             for sent in self.data[key]["kg"][idx]]
+            res["kg_hrt_length"][i, :len(kg_hrt_length)] = kg_hrt_length
+
+        # batch_size * max_kg_num * max_kg_hrt_length
+        res["kg"] = np.zeros((batch_size, max_kg_num, np.max(res["kg_hrt_length"])), dtype=int)
+        for i, idx in enumerate(indexes):
+            for j, tri in enumerate(self.data[key]["kg"][idx]):
+                # 获取知识中单词对应的索引
+                sent = (tri[0] + tri[1] + tri[2])[self._max_know_length]
+                res["kg"][i, j, :len(sent)] = sent
+
+        # 将每一个样例中使用的知识对应位置设为1
+        res["kg_index"] = np.zeros((batch_size, max_kg_num), dtype=float)
+        for i, idx in enumerate(indexes):
+            for kgid in self.data[key]["kg_index"][idx]:
+                res["kg_index"][i, kgid] = 1
+
+        return res
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

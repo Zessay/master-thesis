@@ -17,6 +17,7 @@ from tqdm import trange
 import numpy as np
 import torch
 from torch import nn
+import torch.nn.functional as F
 from transformers import BertPreTrainedModel, BertModel, BertConfig
 from transformers import AdamW
 from transformers.activations import ACT2FN
@@ -24,7 +25,7 @@ from transformers.activations import ACT2FN
 from myCoTK.dataloader import MyMemBERTRetrieval
 from myCoTK.wordvector import TencentChinese
 from utils.cache_helper import try_cache
-from utils.common import seed_everything, save_losses
+from utils.common import seed_everything, save_losses, masked_softmax
 from utils.MyMetrics import MyMetrics
 
 
@@ -61,18 +62,22 @@ class BERTRetrieval(BertPreTrainedModel):
         self.embed = nn.Embedding.from_pretrained(torch.FloatTensor(init_embeddings), freeze=False)
 
         #self.classifier = nn.Linear(self.bert_config.hidden_size + self.embed_size, 1)
-        self.classifier = nn.Linear(2 * self.bert_config.hidden_size, 1)
-        self.reshape = nn.Linear(self.bert_config.hidden_size, self.embed_size, bias=False)
-        self.reshape_know = nn.Linear(self.embed_size, self.bert_config.hidden_size, bias=True)
+        self.classifier = nn.Linear(self.embed_size + self.bert_config.hidden_size, 1)
+        self.A = nn.Parameter(torch.Tensor(self.bert_config.hidden_size, self.embed_size))
+        self.bias = nn.Parameter(torch.Tensor(1))
+
         self.know_activation = ACT2FN["gelu"]
-        self.softmax = nn.Softmax(dim=-1)
         self.activation = nn.Sigmoid()
+
+        nn.init.xavier_normal_(self.A)
+        self.bias.data.fill_(0)
 
     def forward(self, data, labels=None):
         input_ids = data['input_ids']
         token_type_ids = data['segment_ids']
         attention_mask = data['input_mask']
         outputs = self.bert(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids)
+        # [batch_size, bert_hidden_size]
         pair_output = outputs[1]
         if labels is not None:
             pair_output = self.dropout(pair_output)
@@ -87,11 +92,7 @@ class BERTRetrieval(BertPreTrainedModel):
         # length对应的维度为[batch_size, max_kg_length]
         # 根据长度计算知识对应的mask矩阵
         # 输出维度为[batch_size, max_kg_num, max_kg_hrt_length, 1]
-        kg_hr_mask = get_kg_mask(data['kg_hr_length'], kg_len)
         kg_hrt_mask = get_kg_mask(data['kg_hrt_length'], kg_len)
-        kg_key_mask = kg_hr_mask                  # 这个mask只关注head entity和relation
-        kg_value_mask = kg_hrt_mask - kg_hr_mask  # 这个mask只关注tail entity
-
         # 将kg输入的单词转化为embedding
         # [batch_size, max_kg_num, max_kg_hrt_length, embed_dim]
         kg_input = self.embed(data['kg'])
@@ -99,40 +100,35 @@ class BERTRetrieval(BertPreTrainedModel):
         # 这里只是将head entity和relation的嵌入相加
         # 然后除以对应的长度，相当于词向量的平均
         # [batch_size, max_kg_num, embed_dim]
-        kg_key_avg = torch.sum(kg_input * kg_key_mask, dim=2) / torch.max(
-            torch.sum(kg_key_mask, dim=2), torch.ones_like(data['kg_hrt_length'].unsqueeze(-1), dtype=torch.float32))
-        kg_value_avg = torch.sum(kg_input * kg_value_mask, dim=2) / torch.max(
-            torch.sum(kg_value_mask, dim=2), torch.ones_like(data['kg_hrt_length'].unsqueeze(-1), dtype=torch.float32))
-        # 这里相当于是句对经过BERT之后的表征
-        # 首先经过线性层将bert表征的维度转化为和单词相同的维度
-        # [batch_size, 1, embed_dim]
-        query = torch.reshape(self.reshape(pair_output), [batch_size, 1, self.embed_size])
-        # 根据cls的向量和知识中的head和relation平均向量，计算attention的分数
-        # [batch_size, max_kg_num]
-        kg_score = torch.sum(query * kg_key_avg, dim=2)
-        # 这里根据hrt的长度，计算kg的mask向量
-        # [batch_size, max_kg_num]
-        cond = (data['kg_hrt_length'] > 0).float()
-        # 将mask的位置设为负无穷
-        kg_score = kg_score * cond - (torch.ones_like(cond, dtype=torch.float32) - cond) * 1e23
-        # 得到对于每个知识的attention分数
-        # [batch_size, max_kg_num]
-        kg_alignment = self.softmax(kg_score)
+        # kg_key_avg = torch.sum(kg_input * kg_key_mask, dim=2) / torch.max(
+        #     torch.sum(kg_key_mask, dim=2), torch.ones_like(data['kg_hrt_length'].unsqueeze(-1), dtype=torch.float32))
+        # kg_value_avg = torch.sum(kg_input * kg_value_mask, dim=2) / torch.max(
+        #     torch.sum(kg_value_mask, dim=2), torch.ones_like(data['kg_hrt_length'].unsqueeze(-1), dtype=torch.float32))
+        # 计算三元组的均值向量, [batch, max_kg_num, embed_dim]
+        kg_hrt_avg = torch.sum(kg_input * kg_hrt_mask, dim=2) / torch.max(
+            torch.sum(kg_hrt_mask, dim=2), torch.ones_like(data['kg_hrt_length'].unsqueeze(-1), dtype=torch.float32))
+
+        # [B, 1, embed_dim]
+        intermediate = pair_output.mm(self.A).unsqueeze(dim=1)
+        # [B, max_kg_num]
+        kg_alignment = intermediate.bmm(kg_hrt_avg.transpose(1,2)).squeeze(dim=1) + self.bias
+        kg_mask = (data["kg_hrt_length"] > 0).to(torch.bool)
+        kg_alignment = masked_softmax(kg_alignment, kg_mask, dim=-1)
+
+        # 对知识表征加权, [batch, embed_dim]
+        knowledge_embed = kg_alignment.unsqueeze(dim=1).bmm(kg_hrt_avg).squeeze(dim=1)
 
         # 找到attention分数最大的位置
         kg_max = torch.argmax(kg_alignment, dim=-1)
         # 将对应位置设为1
         # [batch_size, max_kg_num]
-        kg_max_onehot = torch.nn.functional.one_hot(kg_max, num_classes=kg_alignment.shape[1]).float()
+        kg_max_onehot = F.one_hot(kg_max, num_classes=kg_alignment.shape[1]).float()
 
-        # 计算每一个样例的加权平均向量
-        # [batch_size, embed_dim]
-        knowledge_embed = torch.sum(kg_alignment.unsqueeze(-1) * kg_value_avg, dim=1)
         # 将知识的表征embed_dim重新映射到BERT的表征维度 bert_hidden_size
-        # [batch_size, bert_hidden_size]
-        relu_know = self.know_activation(self.reshape_know(knowledge_embed))
+        # [batch_size, embed_dim]
+        act_know = self.know_activation(knowledge_embed)
         # 经过分类器分类，并转化为概率
-        logits = self.classifier(torch.cat([pair_output, relu_know], dim=-1))
+        logits = self.classifier(torch.cat([pair_output, act_know], dim=-1))
         # logits = self.classifier(pair_output + relu_know)
         prob = self.activation(logits.view(-1))
 
@@ -444,7 +440,7 @@ def main():
         device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
         n_gpu = torch.cuda.device_count()
 
-        random.seed(args.seed)
+        seed_everything(args.seed)
 
         output_model_file = os.path.join(args.model_dir, "pytorch_model.%d.%d.bin" %
                                          (total_epoch,
@@ -504,8 +500,8 @@ def main():
         result = metric.close()
         result.update({'hits@%d' % key: value[0] / value[1] for key, value in hits.items()})
 
-        output_prediction_file = args.output_dir + "/%s_%s.txt" % (args.name, "test")
-        with open(output_prediction_file, "w") as f:
+        output_prediction_file = args.output_dir + f"/{args.name}_test.{total_epoch}.{chosen_epoch}.txt"
+        with open(output_prediction_file, "w", encoding="utf-8") as f:
             print("Test Result:")
             res_print = list(result.items())
             res_print.sort(key=lambda x: x[0])

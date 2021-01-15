@@ -7,7 +7,7 @@ python run.py \
   --datapath=../../data/film \
   --batch_size=32 \
   --max_sent_length=512 \
-  --max_decoder_length=50 \
+  --max_decoder_length=30 \
   --output_dir=/data/results/kdconv/output/film/seq2seq \
   --model_dir=/data/results/kdconv/model/film/seq2seq \
   --cache_dir=/data/results/kdconv/cache/film/seq2seq \

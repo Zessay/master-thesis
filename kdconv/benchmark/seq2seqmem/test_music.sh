@@ -8,7 +8,7 @@ python run.py \
   --batch_size=32 \
   --max_sent_length=512 \
   --max_know_length=100 \
-  --max_decoder_length=50 \
+  --max_decoder_length=30 \
   --output_dir=/data/results/kdconv/output/music/seq2seqmem \
   --model_dir=/data/results/kdconv/model/music/seq2seqmem \
   --cache_dir=/data/results/kdconv/cache/music/seq2seqmem \

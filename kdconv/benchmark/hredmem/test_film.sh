@@ -8,7 +8,7 @@ python run.py \
   --batch_size=32 \
   --max_sent_length=512 \
   --max_know_length=100 \
-  --max_decoder_length=50 \
+  --max_decoder_length=30 \
   --output_dir=/data/results/kdconv/output/film/hredmem \
   --model_dir=/data/results/kdconv/model/film/hredmem \
   --cache_dir=/data/results/kdconv/cache/film/hredmem \

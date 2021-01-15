@@ -7,7 +7,7 @@ python run.py \
   --datapath=../../data/music \
   --batch_size=32 \
   --max_sent_length=512 \
-  --max_decoder_length=50 \
+  --max_decoder_length=30 \
   --output_dir=/data/results/kdconv/output/music/hred \
   --model_dir=/data/results/kdconv/model/music/hred \
   --cache_dir=/data/results/kdconv/cache/music/hred \

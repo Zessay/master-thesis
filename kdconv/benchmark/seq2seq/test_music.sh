@@ -7,7 +7,7 @@ python run.py \
   --datapath=../../data/music \
   --batch_size=32 \
   --max_sent_length=512 \
-  --max_decoder_length=50 \
+  --max_decoder_length=30 \
   --output_dir=/data/results/kdconv/output/music/seq2seq \
   --model_dir=/data/results/kdconv/model/music/seq2seq \
   --cache_dir=/data/results/kdconv/cache/music/seq2seq \
