@@ -16,8 +16,6 @@ import numpy as np
 from tqdm import trange
 import torch
 import torch.nn.functional as F
-import torch.nn as nn
-from itertools import chain
 from transformers import BertTokenizer, GPT2Config
 from transformers import AdamW
 
@@ -44,7 +42,7 @@ def warmup_linear(x, warmup=0.002):
 
 
 def preprocess_batch(data, device=None):
-    for key in ['input_ids', 'input_mask', 'token_type_ids', 'turn_ids', 'source_ids', 'lm_labels']:
+    for key in ['input_ids', 'input_mask', 'token_type_ids', 'turn_ids', 'lm_labels']:
         if "labels" not in key:
             data[key] = torch.LongTensor(data[key])
         else:

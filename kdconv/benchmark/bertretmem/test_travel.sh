@@ -15,8 +15,8 @@ python run_BERTRetrieval.py \
 	--num_turns=8 \
 	--predict_batch_size=8 \
 	--cache \
-	--cache_dir=/data/results/kdconv/cache/travel/bert_mem_ret \
+	--cache_dir=/data/results/kdconv/cache/travel/bert_ret_mem \
 	--datapath=../../data/travel \
-	--num_train_epochs=5.0 \
-	--output_dir=/data/results/kdconv/output/travel/bert_mem_ret \
-  --model_dir=/data/results/kdconv/model/travel/bert_mem_ret
+	--num_train_epochs=8.0 \
+	--output_dir=/data/results/kdconv/output/travel/bert_ret_mem \
+  --model_dir=/data/results/kdconv/model/travel/bert_ret_mem

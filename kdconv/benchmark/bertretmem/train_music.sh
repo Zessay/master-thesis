@@ -17,11 +17,11 @@ python run_BERTRetrieval.py \
 	--learning_rate=5e-5 \
 	--lamb=0.0 \
 	--cache \
-	--cache_dir=/data/results/kdconv/cache/music/bert_mem_ret \
+	--cache_dir=/data/results/kdconv/cache/music/bert_ret_mem \
 	--datapath=../../data/music \
 	--num_train_epochs=5.0 \
 	--warmup_proportion=0.1 \
-	--output_dir=/data/results/kdconv/output/music/bert_mem_ret \
-  --model_dir=/data/results/kdconv/model/music/bert_mem_ret \
+	--output_dir=/data/results/kdconv/output/music/bert_ret_mem \
+  --model_dir=/data/results/kdconv/model/music/bert_ret_mem \
   --gradient_accumulation_steps=8 \
   --seed=42
