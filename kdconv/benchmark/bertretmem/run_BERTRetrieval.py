@@ -66,7 +66,12 @@ class BERTRetrieval(BertPreTrainedModel):
         self.A = nn.Parameter(torch.Tensor(self.bert_config.hidden_size, self.embed_size))
         self.bias = nn.Parameter(torch.Tensor(1))
 
-        self.know_activation = ACT2FN["gelu"]
+        # BERT中的[CLS]是先经过Transformer层中MLP最后是layer-norm
+        # 然后经过BertPooler层使用nn.Tanh激活的
+        self.layer_norm = nn.LayerNorm(self.embed_size, eps=self.bert_config.layer_norm_eps)
+        # self.know_activation = ACT2FN["gelu"]
+        self.know_activation = nn.Tanh()
+
         self.activation = nn.Sigmoid()
 
         nn.init.xavier_normal_(self.A)
@@ -126,7 +131,7 @@ class BERTRetrieval(BertPreTrainedModel):
 
         # 将知识的表征embed_dim重新映射到BERT的表征维度 bert_hidden_size
         # [batch_size, embed_dim]
-        act_know = self.know_activation(knowledge_embed)
+        act_know = self.know_activation(self.layer_norm(knowledge_embed))
         # 经过分类器分类，并转化为概率
         logits = self.classifier(torch.cat([pair_output, act_know], dim=-1))
         # logits = self.classifier(pair_output + relu_know)
@@ -197,7 +202,7 @@ def main():
     parser.add_argument('--wv_path', type=str, default='/home/zhengchujie/wordvector/chinese',
                         help="Directory for pretrained wordvector. Default: resources://Glove300d")
     parser.add_argument('--embedding_size', type=int, default=200,
-                        help="Directory for pretrained wordvector. Default: resources://Glove300d")
+                        help="The embed dim of the pretrained word vector.")
 
     parser.add_argument("--num_choices", default=10, type=int,
                         help="the number of retrieval options")
