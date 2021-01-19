@@ -12,7 +12,7 @@ python run_BERTRetrieval.py \
 	--max_sent_length=256 \
 	--num_turns=8 \
 	--train_batch_size=16 \
-	--learning_rate=3e-5 \
+	--learning_rate=5e-5 \
 	--cache \
 	--cache_dir=/data/results/kdconv/cache/film/bert_ret \
 	--datapath=../../data/film \

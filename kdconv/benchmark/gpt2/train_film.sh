@@ -7,7 +7,6 @@ python run_GPTGen.py \
   --vocab_file=/data/models/ptms/CDial-GPT2_LCCC-base/vocab.txt \
   --init_checkpoint=/data/models/ptms/CDial-GPT2_LCCC-base/pytorch_model.bin \
   --name=GPT2Gen \
-  --num_choices=10 \
 	--max_sent_length=256 \
 	--num_turns=8 \
 	--train_batch_size=16 \
@@ -15,7 +14,7 @@ python run_GPTGen.py \
 	--cache \
 	--cache_dir=/data/results/kdconv/cache/film/gpt2gen \
 	--datapath=../../data/film \
-	--num_train_epochs=5.0 \
+	--num_train_epochs=10.0 \
 	--warmup_proportion=0.1 \
 	--output_dir=/data/results/kdconv/output/film/gpt2gen \
   --model_dir=/data/results/kdconv/model/film/gpt2gen \

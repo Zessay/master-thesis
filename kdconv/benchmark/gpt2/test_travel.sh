@@ -10,7 +10,6 @@ python run_GPTGen.py \
   --num_choices=10 \
 	--max_sent_length=256 \
 	--num_turns=8 \
-	--predict_batch_size=1 \
 	--min_decoder_length=3 \
 	--max_decoder_length=30 \
 	--temperature=0.7 \
@@ -18,7 +17,7 @@ python run_GPTGen.py \
 	--cache \
 	--cache_dir=/data/results/kdconv/cache/travel/gpt2gen \
 	--datapath=../../data/travel \
-	--num_train_epochs=5.0 \
+	--num_train_epochs=10.0 \
 	--output_dir=/data/results/kdconv/output/travel/gpt2gen \
   --model_dir=/data/results/kdconv/model/travel/gpt2gen \
   --seed=42 \

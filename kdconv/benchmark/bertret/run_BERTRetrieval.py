@@ -319,7 +319,7 @@ def main():
     if args.do_predict:
 
         total_epoch = int(args.num_train_epochs)
-        chosen_epoch = 4  # int(args.num_train_epochs)
+        chosen_epoch = 5  # int(args.num_train_epochs)
 
         if not args.no_cuda:
             if not "CUDA_VISIBLE_DEVICES" in os.environ:

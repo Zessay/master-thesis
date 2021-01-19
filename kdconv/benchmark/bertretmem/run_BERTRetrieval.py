@@ -268,6 +268,7 @@ def main():
     if args.cache:
         if not os.path.isdir(args.cache_dir):
             os.mkdir(args.cache_dir)
+        logger.info("加载缓存数据")
         dataManager = try_cache(load_dataset,
                                 {"file_id": args.datapath, "bert_vocab_name": args.vocab_file,
                                  "do_lower_case": args.do_lower_case, "num_choices": args.num_choices,
@@ -283,7 +284,7 @@ def main():
         dataManager = load_dataset(file_id=args.datapath, bert_vocab_name=args.vocab_file, do_lower_case=args.do_lower_case,
                                    num_choices=args.num_choices, max_sent_length=args.max_sent_length,
                                    max_know_length=args.max_know_length, num_turns=args.num_turns)
-        logger.info("加载词向量文件")
+        logger.info("定义并加载词向量文件")
         wv = wordvec_class(args.wv_path)
         vocab = dataManager.id2know_word
         embed = wv.load_matrix(args.embedding_size, vocab)
@@ -436,7 +437,7 @@ def main():
 
     if args.do_predict:
         total_epoch = int(args.num_train_epochs)
-        chosen_epoch = 7
+        chosen_epoch = 8
 
         if not args.no_cuda:
             if not "CUDA_VISIBLE_DEVICES" in os.environ:

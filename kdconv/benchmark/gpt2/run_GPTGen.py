@@ -270,8 +270,8 @@ def main():
                         help="The output directory where the data cache will be written.")
 
     # Other parameters
-    parser.add_argument("--name", type=str, default="GPT2LMHeadModel", help="name of the model")
-    parser.add_argument("--dataset", type=str, default="GPTGen",
+    parser.add_argument("--name", type=str, default="GPT2Gen", help="name of the model")
+    parser.add_argument("--dataset", type=str, default="GPT2Gen",
                         help="Dataloader class.")
     parser.add_argument("--datapath", type=str, default="resources://OpenSubtitles",
                         help="Directory for data set.")
@@ -279,7 +279,7 @@ def main():
                         help="The max length of the sentence pair.")
     parser.add_argument("--num_turns", default=8, type=int,
                         help="The max turn length of the post field.")
-    parser.add_argument("is_relative", action="store_true",
+    parser.add_argument("--is_relative", action="store_true",
                         help="If True, use relative turn embedding, else use absolute turn embedding.")
 
     parser.add_argument("--do_train", action="store_true", help="Whether to run training.")
@@ -497,7 +497,7 @@ def main():
     if args.do_predict:
 
         total_epoch = int(args.num_train_epochs)
-        chosen_epoch = 4
+        chosen_epoch = 10
 
         if not args.no_cuda:
             if not "CUDA_VISIBLE_DEVICES" in os.environ:
@@ -555,7 +555,7 @@ def main():
                 # 这里得到最终输出的所有ids
                 with torch.no_grad():
                     # 这里的pred_logits是经过log_softmax之后的
-                    # pred_ids: [seq_len]
+                    # pred_ids: [seq_len], list型
                     # pred_logits: [seq_len, vocab_size], torch.Tensor类型
                     pred_ids, pred_logits = sample_sequence(history=input_ids,
                                                             model=model,
@@ -606,13 +606,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-
-
-
-
-
-
-
-
