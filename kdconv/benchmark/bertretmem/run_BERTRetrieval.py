@@ -68,9 +68,9 @@ class BERTRetrieval(BertPreTrainedModel):
 
         # BERT中的[CLS]是先经过Transformer层中MLP最后是layer-norm
         # 然后经过BertPooler层使用nn.Tanh激活的
-        self.layer_norm = nn.LayerNorm(self.embed_size, eps=self.bert_config.layer_norm_eps)
-        # self.know_activation = ACT2FN["gelu"]
-        self.know_activation = nn.Tanh()
+        # self.layer_norm = nn.LayerNorm(self.embed_size, eps=self.bert_config.layer_norm_eps)
+        self.know_activation = ACT2FN["gelu"]
+        # self.know_activation = nn.Tanh()
 
         self.activation = nn.Sigmoid()
 
@@ -131,7 +131,7 @@ class BERTRetrieval(BertPreTrainedModel):
 
         # 将知识的表征embed_dim重新映射到BERT的表征维度 bert_hidden_size
         # [batch_size, embed_dim]
-        act_know = self.know_activation(self.layer_norm(knowledge_embed))
+        act_know = self.know_activation(knowledge_embed)
         # 经过分类器分类，并转化为概率
         logits = self.classifier(torch.cat([pair_output, act_know], dim=-1))
         # logits = self.classifier(pair_output + relu_know)
@@ -437,7 +437,7 @@ def main():
 
     if args.do_predict:
         total_epoch = int(args.num_train_epochs)
-        chosen_epoch = 8
+        chosen_epoch = 10
 
         if not args.no_cuda:
             if not "CUDA_VISIBLE_DEVICES" in os.environ:

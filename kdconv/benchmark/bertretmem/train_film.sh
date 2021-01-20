@@ -19,7 +19,7 @@ python run_BERTRetrieval.py \
 	--cache \
 	--cache_dir=/data/results/kdconv/cache/film/bert_ret_mem \
 	--datapath=../../data/film \
-	--num_train_epochs=8.0 \
+	--num_train_epochs=10.0 \
 	--warmup_proportion=0.1 \
 	--output_dir=/data/results/kdconv/output/film/bert_ret_mem \
   --model_dir=/data/results/kdconv/model/film/bert_ret_mem \

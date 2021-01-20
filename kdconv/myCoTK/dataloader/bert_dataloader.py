@@ -21,6 +21,8 @@ import jieba
 from gensim.summarization import bm25
 from typing import List, Optional
 
+from utils.lcs import find_lcs, find_substring_pos_pair
+
 
 logger = logging.getLogger(__name__)
 
@@ -1061,7 +1063,9 @@ class GPTGen(BERTLanguageProcessingBase):
         metric.add_metric(SingleTurnDistinct(self, gen_key=gen_key))
         return metric
 
+
 # ---------------------------- 基于知识选择的GPT生成 --------------------------------
+
 
 class GPTGenKA(GPTGen):
     """基于知识注意力机制的GPT生成模型"""
@@ -1085,7 +1089,6 @@ class GPTGenKA(GPTGen):
                          max_sent_length, num_turns, is_relative,
                          ext_vocab, key_name, cpu_count)
         self._max_know_length = max_know_length
-
 
     def _load_data(self):
         logger.info("开始读取和处理数据")
@@ -1137,7 +1140,7 @@ class GPTGenKA(GPTGen):
                     cur_speaker = self.speakers_id[0]
                     for j in range(max(0, (i+1)-(self.num_turns-1)), i+1):
                         cur_speaker = self.speakers_id[0] if j % 2 == 0 else self.speakers_id[1]
-                        posts.append([cur_speaker] + [self.convert_tokens_to_bert_ids(turns[j])])
+                        posts.append([cur_speaker] + self.convert_tokens_to_bert_ids(turns[j]))
                     prev_posts = posts[-1]
                     # 获取回复对应的对话人id
                     next_speaker = self.speakers_id[0] if cur_speaker == self.speakers_id[1] else self.speakers_id[1]
@@ -1319,129 +1322,358 @@ class GPTGenKA(GPTGen):
 
 # ---------------------------- 基于知识树的GPT生成 --------------------------------
 
-def find_lcs(query: List[str], attr_name: List[str]) -> List[int]:
-    """找到query中每个token在attr_name中出现的位置"""
-    query_len, attr_name_len = len(query), len(attr_name)
-    # 用来保存对应位置的匹配结果
-    match = [[0 for _ in range(attr_name_len + 1)] for _ in range(query_len + 1)]
-    # 用来保存回溯的位置
-    track = [[None for _ in range(attr_name_len + 1)] for _ in range(query_len + 1)]
-    # 保存每个query中的token在attr_name中出现的位置
-    occur_pos = [-1 for _ in range(query_len)]
-    for row in range(query_len):
-        for col in range(attr_name_len):
-            if query[row] == attr_name[col]:
-                # 字符匹配成功，该位置等于左上方的值+1
-                match[row + 1][col + 1] = match[row][col] + 1
-                track[row + 1][col + 1] = "ok"
-            elif match[row + 1][col] >= match[row][col + 1]:
-                # 左值大于上值，则该位置的值为左值转移而来，标记回溯方向为左
-                match[row + 1][col + 1] = match[row + 1][col]
-                track[row + 1][col + 1] = "left"
-            else:
-                # 上值大于左值，则该位置的值为上值转移而来，标记回溯方向为上
-                match[row + 1][col + 1] = match[row][col + 1]
-                track[row + 1][col + 1] = "up"
-    # print("match: ", match)
-    # print("track: ", track)
-    # 从后向前回溯
-    row, col = query_len, attr_name_len
-    while match[row][col]:
-        # 获取回溯位置的标记
-        tag = track[row][col]
-        # 如果匹配成功，记录该字符在query中对应的attr_name中的位置
-        if tag == "ok":
-            # 向前找匹配并且是ok的位置，而且match值不能小于当前位置
-            origin_col = col + 1
-            cur_col = col - 1
-            for k in range(col - 1, 0, -1):
-                if match[row][k] < match[row][col]:
-                    cur_col = k
-                    break
-            cur_col += 1
-            # 向后找第一个ok的位置，保证词尽可能连续
-            first_col = origin_col - 1
-            for k in range(cur_col, origin_col):
-                if track[row][k] == "ok":
-                    first_col = k
-                    break
-            last_col = origin_col - 1
-            cur_len = match[row][first_col]
-            if first_col != last_col:
-                # 如果当前token前面没有token了，就不用取前面的了
-                if cur_len <= 1:
-                    col = last_col
-                else:
-                    col = first_col
-            else:
-                col = first_col
-            row -= 1
-            col -= 1
-            occur_pos[row] = col
-        # 向左边找上一个匹配的位置
-        elif tag == "left":
-            col -= 1
-        # 向上面找上一个匹配的位置
-        elif tag == "up":
-            row -= 1
-
-    return occur_pos
-
-
-# 根据query中单词在attr_name中出现的位置
-# 找到最长匹配的子串
-# 以及最后一个匹配单词对应的位置
-def find_substring_pos_pair(query: List[str],
-                            occur_pos: List[int],
-                            tokenizer: BertTokenizer):
-    occur_pos_len = len(occur_pos)
-    max_len = 0
-    query_attr_pos_pair = [-1, -1]
-
-    cur_pos = 0
-    while cur_pos < occur_pos_len:
-        # 如果当前query位置中token在attr_name中出现过
-        if occur_pos[cur_pos] != -1:
-            substring_first_pos = cur_pos
-            cur_pos += 1
-            while (cur_pos < occur_pos_len) and (occur_pos[cur_pos] != -1):
-                cur_pos += 1
-
-            substring_last_pos = cur_pos
-            # 计算当前substring的长度
-            cur_len = substring_last_pos - substring_first_pos + 1
-            # 允许存在连续的UNK token，但是占比必须超过一半
-            if ((cur_len >= 2) and (cur_len > max_len) and
-                    (query[substring_first_pos:substring_last_pos+1].count(tokenizer.unk_token) / cur_len > 0.5)):
-                max_len = cur_len
-                query_attr_pos_pair = [substring_last_pos, occur_pos[substring_last_pos]]
-
-    return query_attr_pos_pair
-
-
-
 
 class GPTGenKT(GPTGen):
-    def __init__(self):
-        pass
+    def __init__(self, file_id: str,
+                 vocab_name: str,
+                 do_lower_case: bool = True,
+                 max_sent_length: int = 256,
+                 max_know_length: int = 128,
+                 num_turns: int = 8,
+                 is_relative: bool = True,
+                 ext_vocab: Optional[List[str]] = None,
+                 key_name: Optional[List[str]] = None,
+                 cpu_count: Optional[int] = None):
+        """
+        用于GPT模型的数据读取类
+        由于GPT的token_type_ids是基于词向量的embedding进行映射的，所以可以直接使用到vocab_size的大小
+        file_id: str，表示数据所在的文件夹路径
+        key_name: List[str]，默认为["train", "dev", "test"]
+        """
+        super().__init__(file_id, vocab_name, do_lower_case,
+                         max_sent_length, num_turns, is_relative,
+                         ext_vocab, key_name, cpu_count)
+        self._max_know_length = max_know_length
+
+    def _load_data(self):
+        logger.info("开始读取和处理数据")
+        begin_time = time.time()
+        origin_data = {}
+
+        for key in self.key_name:
+            origin_data[key] = {"posts": [], "prev_posts": [], "responses": [], "origin_responses": [],
+                                "kg_index": [], "kg": [], "know_pos": [], "know_rt": []}
+            datas = json.load(open("%s/%s.json" % (self._file_path, key), "r", encoding="utf-8"))
+
+            logger.info(f"当前正在处理 {key} 的数据，数据量为{len(datas)}")
+            # 对于每一段对话
+            for data in datas:
+                # 获取当前对话的内容
+                messages = data["messages"]
+                kg = []         # 表示当前对话中所有知识
+                kg_dict = {}    # 表示当前对话中所有知识到序号的映射
+                kg_h_rt = {}    # 保存head实体到relation和tail之间的映射，键h是分词之后的list，值的每个元素是[r_list, t_list]
+                kg_hlist_index = []   # 按照顺序保存hlist
+                kg_index = []    # 表示当前对话使用的kg三元组，保存的是其在知识列表kg中的索引
+                turns = []
+                for message in messages:
+                    kg_index.append([])
+                    # 对当前语句进行分词
+                    sent = self.tokenize(message["message"])
+                    turns.append(sent)
+                    if "attrs" in message:
+                        for attr in message["attrs"]:
+                            h = attr["name"]        # 头实体
+                            r = attr["attrname"]    # 关系
+                            t = attr["attrvalue"]   # 尾实体
+                            # 一组三元组组成知识
+                            k = tuple([h, r, t])
+                            # 首先保证之前没有出现过
+                            if k not in kg_dict:
+                                kg_dict[k] = len(kg)
+                                kg.append(k)
+                                # 对h, r, t进行分词
+                                h_list = self.tokenize(h)
+                                r_list = self.convert_tokens_to_bert_ids(self.tokenize(r))
+                                t_list = self.convert_tokens_to_bert_ids(self.tokenize(t))
+                                # 将r和t添加到对应的h中
+                                if h_list not in kg_h_rt:
+                                    kg_hlist_index[h_list] = len(kg_h_rt)
+                                    kg_h_rt[h_list] = [[r_list, t_list]]   # 这里已经转化成了id
+                                else:
+                                    kg_h_rt[h_list].append([[r_list, t_list]])
+                            kg_index[-1].append(kg_dict[k])
+                # 对于turns中的每一句话，记录其中包含的知识r和t
+                # 这里sent是分词之后的list
+                include_know = []   # List[List[List[r_list, t_list]]]，这里r_list和t_list都是List[int]
+                know_h_index = []   # 表示该句中出现的知识对应的索引
+                pos_pairs = []      # List[List[int]]
+                for sent in turns:
+                    single_turn_khi = []
+                    single_turn_ik = []
+                    single_turn_pp = []
+                    # 遍历所有知识的head实体
+                    for h_list in kg_h_rt.keys():
+                        occur_pos = find_lcs(sent, h_list)    # 找到sent中每一个token在h_list中出现的位置
+                        pos_pair = find_substring_pos_pair(sent, occur_pos, tokenizer=self.tokenizer)
+                        if pos_pair[0] != -1:
+                            single_turn_khi.append(kg_hlist_index[h_list])
+                            single_turn_pp.append(pos_pair[0])
+                            # 这里的kg_h_rt[h_list]是由一系列[r_list, t_list]组成的列表
+                            single_turn_ik.append(kg_h_rt[h_list])
+                    include_know.append(single_turn_ik)
+                    pos_pairs.append(single_turn_pp)
+                    know_h_index.append(single_turn_khi)  # 表示当前居中对应知识head实体的索引
+
+
+                assert len(include_know) == len(turns)
+                assert len(pos_pairs) == len(turns)
+
+                # 得到一段对话的所有语句之后，就可以得到该轮对话中的所有训练样本
+                for i in range(len(turns) - 1):
+                    posts = []       # 保存历史对话
+                    know_pos = []    # 表示当前轮使用的知识插入在哪个位置之后
+                    know_rt = []     # 表示当前轮要插入的知识分词之后的结果
+                    occur_h_index = set([])
+
+                    last_speaker = self.speakers_id[0]
+                    # 从后向前遍历
+                    for j in range(i, max(0, (i+1)-(self.num_turns-1))-1, -1):
+                        cur_speaker = self.speakers_id[0] if j % 2 == 0 else self.speakers_id[1]
+                        if j == i:
+                            last_speaker = cur_speaker
+                        posts = [[cur_speaker] + self.convert_tokens_to_bert_ids(turns[j])] + posts
+                        # 删除当前语句中哪些在后面语句中出现过的知识
+                        cur_know_pos = []
+                        cur_know_rt = []
+                        for st_khi, st_pp, st_ik in zip(know_h_index[j], pos_pairs[j], include_know[j]):
+                            # 对于出现过的知识head实体的索引
+                            for khii, khi in enumerate(st_khi):
+                                if khi not in occur_h_index:
+                                    occur_h_index.add(khi)
+                                    cur_know_pos.append(st_pp[khii]+1)   # 这里因为前面加上了对话人speaker_id，所以+1
+                                    cur_know_rt.append(st_ik[khii])
+                        know_pos = [cur_know_pos] + know_pos
+                        know_rt = [cur_know_rt] + know_rt
+
+                    prev_posts = posts[-1]
+                    # 获取回复对应的对话人id
+                    next_speaker = self.speakers_id[0] if last_speaker == self.speakers_id[1] else self.speakers_id[1]
+                    response = [next_speaker] + self.convert_tokens_to_bert_ids(turns[i+1])
+                    origin_response = turns[i+1]
+
+                    # 将需要使用的知识添加到字典中
+                    origin_data[key]["posts"].append(posts)
+                    origin_data[key]["prev_posts"].append(prev_posts)
+                    origin_data[key]["responses"].append(response)
+                    origin_data[key]["origin_responses"].append(origin_response)
+                    # 保存当前对话中所有的知识
+                    origin_data[key]["kg"].append(kg)
+                    origin_data[key]["kg_index"].append(kg_index[i+1])  # 当前回复所使用的知识索引
+
+                    # 记录知识在每一轮中出现的位置和包含的rt分词转化为索引的结果
+                    origin_data[key]["know_pos"].append(know_pos)
+                    origin_data[key]["know_rt"].append(know_rt)
+
+
+        logger.info(f"完成数据读取和处理，共计用时{time.time()-begin_time} s")
+
+        # 保存bert词表
+        vocab_list = [each for each in self.bert_id2word]
+        valid_vocab_len = len(vocab_list)
+        logger.info(f"词表的数量为：{valid_vocab_len}")
+
+        # 计算train, dev, test每一组数据集的大小
+        data_size = {key: len(origin_data[key]["responses"]) for key in self.key_name}
+        print("数据集统计：", data_size)
+        return vocab_list, valid_vocab_len, origin_data, data_size
+
+    def get_batch(self, key, indexes):
+        if key not in self.key_name:
+            raise ValueError("No set named %s." % key)
+        res = {
+            "resp": [self.data[key]["origin_responses"][i] for i in indexes],  # 表示回复的原文本
+            "resp_lens": [len(self.data[key]["origin_responses"][i]) for i in indexes],  # 表示回复原文本的长度
+            "posts_lens": None,
+            "input_ids": None,
+            "input_mask": None,
+            "token_type_ids": None,
+            "turn_ids": None,
+            "source_ids": None,
+            "position_ids": None,
+            "lm_labels": None
+        }
+
+        all_input_ids, all_input_mask, all_token_type_ids, all_turn_ids, all_lm_labels = [], [], [], [], []
+        all_source_ids, all_position_ids = [], []
+        posts_lens = []
+
+        for iidx, idx in enumerate(indexes):
+            # 获取上下文的语句和当前回复语句
+            # 这里的语句都已经转化为了id的形式
+            # 并且每个语句的第一个token都表示对话人的标识
+            posts = self.data[key]["posts"][idx]
+            response = self.data[key]["responses"][idx]
+            know_pos = self.data[key]["know_pos"][idx]    # 表示每个知识要插入的位置
+            know_rt = self.data[key]["know_rt"][idx]      # 表示每个位置插入的内容
+
+            # 计算当前response的长度
+            resp_len = len(response)
+            # 如果当前的回复长度大于允许的最大长度
+            # 由于头尾有[CLS]和[SEP]
+            if resp_len > self._max_sent_length - 2:
+                response = response[:self._max_sent_length - 2]
+                allow_max_length = 0
+            else:
+                allow_max_length = self._max_sent_length - 2 - resp_len
+            # 对posts的长度进行裁剪
+            posts = self.trim_posts(posts, allow_max_length)
+
+            # 表示当前上下文轮次的上次
+            turn_len = len(posts)
+            if turn_len > 0:
+                know_pos = know_pos[-turn_len:]
+                know_rt = know_rt[-turn_len:]
+
+            # 获取token_type_ids
+            resp_token_type_ids = self.get_token_type_ids(response)
+            posts_token_type_ids = []
+            for post in posts:
+                posts_token_type_ids.append(self.get_token_type_ids(post))
+
+            # 获取turn_ids
+            if self.is_relative:
+                posts_turns, resp_turns = self.get_relative_turns(posts, response)
+            else:
+                posts_turns, resp_turns = self.get_absolute_turns(posts, response)
+
+            # 处理知识并获取对应的id
+            (know_input_ids, know_turn_ids, know_token_type_ids,
+             know_position_ids, know_src_ids,
+             posts_position_ids, posts_src_ids) = self.merge_know_to_posts(know_pos,
+                                                                           know_rt,
+                                                                           posts,
+                                                                           posts_turns,
+                                                                           posts_token_type_ids)
+            # 首先将posts嵌套列表全部转化为列表的形式
+            posts_input_ids = list(chain(*posts))
+            posts_turn_ids = list(chain(*posts_turns))
+            posts_token_type_ids = list(chain(*posts_token_type_ids))
+            posts_position_ids = list(chain(*posts_position_ids))
+            posts_src_ids = list(chain(*posts_src_ids))
+
+            # 将知识的输入并入到posts的前面
+            history_input_ids = know_input_ids + posts_input_ids
+            history_turn_ids = know_turn_ids + posts_turn_ids
+            history_token_type_ids = know_token_type_ids + posts_token_type_ids
+            history_position_ids = know_position_ids + posts_position_ids
+            # 考虑到在history前面需要加上go_id，所以history中的所有id都要+1
+            history_position_ids = [pid+1 for pid in history_position_ids]
+            history_src_ids = know_src_ids + posts_src_ids
+            if key != "test":
+                # 转化为GPT2的输入
+                posts_len = len(history_input_ids) + 1  # 包含go_id, knowledge和posts
+                input_ids = [self.bert_go_id] + history_input_ids + response + [self.bert_eos_id]
+                token_type_ids = [self.bert_go_id] + history_token_type_ids + resp_token_type_ids + [self.bert_eos_id]
+                turn_ids = [posts_turn_ids[0]] + history_turn_ids + resp_turns + [resp_turns[-1]]
+                position_ids = [0] + history_position_ids + list(
+                    range(history_position_ids[-1] + 1, history_position_ids[-1]+len(response)+2))    # 这里+2是因为最后还有eos_id
+                src_ids = [0] + history_src_ids + [0] * (len(response) + 1)
+                input_mask = [1] * len(input_ids)
+
+                # 获取对应的单词标签
+                # 在GPT内部计算loss时有shift操作，所以这里只需要逐一对齐即可
+                lm_labels = [-1] * posts_len + [-1] + response[1:] + [self.bert_eos_id]
+
+                assert len(input_ids) == len(position_ids)
+                assert len(input_ids) == len(src_ids)
+
+                padding = [0] * (self._max_sent_length - len(input_ids))
+                input_ids = input_ids + padding
+                token_type_ids = token_type_ids + padding
+                turn_ids = turn_ids + padding
+                position_ids = position_ids + padding
+                src_ids = src_ids + padding
+                input_mask = input_mask + padding
+                lm_labels = lm_labels + [-1] * len(padding)
+
+                all_input_ids.append(input_ids)
+                all_token_type_ids.append(token_type_ids)
+                all_turn_ids.append(turn_ids)
+                all_position_ids.append(position_ids)
+                all_source_ids.append(src_ids)
+                all_input_mask.append(input_mask)
+                all_lm_labels.append(lm_labels)
+                posts_lens.append(posts_len)
+            else:
+                # 预测时输入是不包含response的
+                # 对预测输入的封装不进行padding
+                posts_len = len(posts_input_ids) + 1
+                input_ids = [self.bert_go_id] + history_input_ids + [response[0]]
+                token_type_ids = [self.bert_go_id] + history_token_type_ids + [resp_token_type_ids[0]]
+                turn_ids = [posts_turn_ids[0]] + history_turn_ids + [resp_turns[0]]
+                position_ids = [0] + history_position_ids + [history_position_ids[-1] + 1]
+                src_ids = [0] + history_src_ids + [0]
+
+                assert len(input_ids) == len(turn_ids)
+
+                all_input_ids.append(input_ids)
+                all_token_type_ids.append(token_type_ids)
+                all_turn_ids.append(turn_ids)
+                all_position_ids.append(position_ids)
+                all_source_ids.append(src_ids)
+                posts_lens.append(posts_len)
+
+
+        # 将当前输入保存到词典中
+        res["input_ids"] = all_input_ids
+        res["token_type_ids"] = all_token_type_ids
+        res["turn_ids"] = all_turn_ids
+        res["position_ids"] = all_position_ids
+        res["source_ids"] = all_source_ids
+        res["input_mask"] = all_input_mask
+        res["lm_labels"] = all_lm_labels
+        res["posts_lens"] = posts_lens
+        return res
 
 
 
 
 
+    def merge_know_to_posts(self, know_pos, know_rt, posts, posts_turns, posts_token_type_ids):
+        know_input_ids = []
+        know_turn_ids = []
+        know_token_type_ids = []
+        know_position_ids = []
+        posts_position_ids = []
+        posts_src_ids = []
 
+        turn_len = len(posts)  # 表示上下文轮次的数量
+        next_turn_start_pid = 0
+        for i in range(turn_len):
+            st_tids = posts_turns[i]
+            st_ttids = posts_token_type_ids[i]
+            st_kpos = know_pos[i]
+            st_krt = know_rt[i]
+            st_len = len(st_tids)
+            st_pids = list(range(next_turn_start_pid, next_turn_start_pid + st_len))
+            next_turn_start_pid += st_len        # 下一轮position_id的起始位置
+            posts_position_ids.append(st_pids)
+            posts_src_ids.append([0] * st_len)
+            # 对于当前位置中所有要插入知识的位置
+            # 以及对应要插入的知识的relation和tail entity
+            for pos, rt in zip(st_kpos, st_krt):
+                # 获取当前要插入位置的position_id, turn_id, token_type_id
+                position_id = st_pids[pos]
+                turn_id = st_tids[pos]
+                token_type_id = st_ttids[pos]
 
+                relation_len = len(rt[0])
+                tail_len = len(rt[1])
+                know_input_ids.extend(rt[0] + rt[1])
+                know_position_ids.extend([position_id + 1] * relation_len + [position_id + 2] * tail_len)
 
+                know_turn_ids.extend([turn_id] * (relation_len + tail_len))
+                know_token_type_ids.extend([token_type_id] * (relation_len + tail_len))
 
+        # 根据max_know_length对知识进行截断
+        know_input_ids = know_input_ids[-self._max_know_length:]
+        know_turn_ids = know_turn_ids[-self._max_know_length:]
+        know_token_type_ids = know_token_type_ids[-self._max_know_length:]
+        know_position_ids = know_position_ids[-self._max_know_length:]
+        know_src_ids = [1] * len(know_position_ids)
 
-
-
-
-
-
-
-
-
-
+        return (know_input_ids, know_turn_ids, know_token_type_ids,
+                know_position_ids, know_src_ids, posts_position_ids, posts_src_ids)
 
 

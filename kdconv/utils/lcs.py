@@ -77,6 +77,11 @@ def find_lcs(query: List[str], attr_name: List[str]) -> List[int]:
 def find_substring_pos_pair(query: List[str],
                             occur_pos: List[int],
                             tokenizer: BertTokenizer):
+    """
+    根据query中单词在attr_name中出现的位置
+    找到最长匹配的子串
+    以及最后一个匹配单词对应的位置
+    """
     occur_pos_len = len(occur_pos)
     max_len = 0
     query_attr_pos_pair = [-1, -1]
@@ -101,20 +106,3 @@ def find_substring_pos_pair(query: List[str],
             cur_pos += 1
 
     return query_attr_pos_pair
-
-
-if __name__ == '__main__':
-    model_path = r"E:\Models\CDial-GPT2_LCCC-base"
-    tokenizer = BertTokenizer.from_pretrained(model_path)
-
-    sentence = "知道重庆森林这部电影吗？"
-    attr_name = "重庆森林（1994年王家卫执导电影）"
-
-    sent_list = tokenizer.tokenize(sentence)
-    attr_name_list = tokenizer.tokenize(attr_name)
-
-    occur_pos = find_lcs(sent_list, attr_name)
-
-    pos_pair = find_substring_pos_pair(query=sent_list, occur_pos=occur_pos, tokenizer=tokenizer)
-
-    print(pos_pair)
