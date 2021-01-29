@@ -15,7 +15,7 @@ python run_BERTRetrieval.py \
 	--num_turns=8 \
 	--train_batch_size=16 \
 	--learning_rate=5e-5 \
-	--lamb=0.0 \
+	--lamb=0.6 \
 	--cache \
 	--cache_dir=/data/results/kdconv/cache/film/bert_ret_mem \
 	--datapath=../../data/film \

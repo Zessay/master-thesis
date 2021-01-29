@@ -68,9 +68,9 @@ class BERTRetrieval(BertPreTrainedModel):
 
         # BERT中的[CLS]是先经过Transformer层中MLP最后是layer-norm
         # 然后经过BertPooler层使用nn.Tanh激活的
-        # self.layer_norm = nn.LayerNorm(self.embed_size, eps=self.bert_config.layer_norm_eps)
-        self.know_activation = ACT2FN["gelu"]
-        # self.know_activation = nn.Tanh()
+        self.layer_norm = nn.LayerNorm(self.embed_size, eps=self.bert_config.layer_norm_eps)
+        # self.know_activation = ACT2FN["gelu"]
+        self.know_activation = nn.Tanh()
 
         self.activation = nn.Sigmoid()
 
@@ -131,7 +131,8 @@ class BERTRetrieval(BertPreTrainedModel):
 
         # 将知识的表征embed_dim重新映射到BERT的表征维度 bert_hidden_size
         # [batch_size, embed_dim]
-        act_know = self.know_activation(knowledge_embed)
+        # act_know = self.know_activation(knowledge_embed)
+        act_know = self.know_activation(self.layer_norm(knowledge_embed))
         # 经过分类器分类，并转化为概率
         logits = self.classifier(torch.cat([pair_output, act_know], dim=-1))
         # logits = self.classifier(pair_output + relu_know)
@@ -162,6 +163,7 @@ def warmup_linear(x, warmup=0.002):
     if x < warmup:
         return x/warmup
     return 1.0 - x
+
 
 def preprocess_batch(data, device=None):
     for key in ['input_ids', 'input_mask', 'segment_ids', 'labels', 'kg_hr_length', 'kg_hrt_length', 'kg', 'kg_index']:
@@ -387,7 +389,7 @@ def main():
                 else:
                     preprocess_batch(data)
                 loss, kg_loss, kg_acc = model(data, data['labels'])
-                # loss = loss + args.lamb * kg_loss
+                loss = loss + args.lamb * kg_loss
                 if n_gpu > 1:
                     loss = loss.mean() # mean() to average on multi-gpu.
                 if args.gradient_accumulation_steps > 1:
