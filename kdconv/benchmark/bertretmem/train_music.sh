@@ -14,8 +14,8 @@ python run_BERTRetrieval.py \
 	--max_know_length=128 \
 	--num_turns=8 \
 	--train_batch_size=16 \
-	--learning_rate=5e-5 \
-	--lamb=0.6 \
+	--learning_rate=1e-4 \
+	--lamb=0.2 \
 	--cache \
 	--cache_dir=/data/results/kdconv/cache/music/bert_ret_mem \
 	--datapath=../../data/music \

@@ -20,6 +20,7 @@ from torch import nn
 import torch.nn.functional as F
 from transformers import BertPreTrainedModel, BertModel, BertConfig
 from transformers import AdamW
+from transformers import get_linear_schedule_with_warmup
 from transformers.activations import ACT2FN
 
 from myCoTK.dataloader import MyMemBERTRetrieval
@@ -353,19 +354,37 @@ def main():
         model = torch.nn.DataParallel(model)
 
         # Prepare optimizer
-        param_optimizer = list(model.named_parameters())
+        # param_optimizer = list(model.named_parameters())
+        #
+        # # hack to remove pooler, which is not used
+        # # thus it produce None grad that break apex
+        # param_optimizer = [n for n in param_optimizer if 'pooler' not in n[0]]
+        # 分层学习率
+        bert_param_optimizer = [(n, p) for n, p in list(model.bert.named_parameters()) if "pooler" not in n]
+        other_param_optimizer = [(n, p) for n, p in model.named_parameters() if "bert" not in n]
 
-        # hack to remove pooler, which is not used
-        # thus it produce None grad that break apex
-        param_optimizer = [n for n in param_optimizer if 'pooler' not in n[0]]
+
 
         no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+        # optimizer_grouped_parameters = [
+        #     {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+        #     {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}]
+
         optimizer_grouped_parameters = [
-            {'params': [p for n, p in param_optimizer if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
-            {'params': [p for n, p in param_optimizer if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}]
+            {"params": [p for n, p in bert_param_optimizer if not any(nd in n for nd in no_decay)],
+             "weight_decay": 0.01, "lr": 2e-5},
+            {"params": [p for n, p in bert_param_optimizer if any(nd in n for nd in no_decay)],
+             "weight_decay": 0.0, "lr": 2e-5},
+            {"params": [p for n, p in other_param_optimizer if not any(nd in n for nd in no_decay)],
+             "weight_decay": 0.01, "lr": args.learning_rate},
+            {"params": [p for n, p in other_param_optimizer if any(nd in n for nd in no_decay)],
+             "weight_decay": 0.0, "lr": args.learning_rate}
+        ]
 
         t_total = num_train_steps
         optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate)
+        scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=int(t_total * args.warmup_proportion),
+                                                    num_training_steps=t_total)
         global_step = 0
 
         logger.info("***** Running training *****")
@@ -400,11 +419,12 @@ def main():
                 loss.backward()
                 if (step + 1) % args.gradient_accumulation_steps == 0:
                     # modify learning rate with special warm up BERT uses
-                    lr_this_step = args.learning_rate * warmup_linear(global_step / t_total, args.warmup_proportion)
-                    for param_group in optimizer.param_groups:
-                        param_group['lr'] = lr_this_step
+                    # lr_this_step = args.learning_rate * warmup_linear(global_step / t_total, args.warmup_proportion)
+                    # for param_group in optimizer.param_groups:
+                    #     param_group['lr'] = lr_this_step
                     optimizer.step()
-                    optimizer.zero_grad()
+                    scheduler.step()
+                    model.zero_grad()
                     global_step += 1
 
                     # 每次反向传播之前记录一下当前的指标
