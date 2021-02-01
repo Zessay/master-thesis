@@ -354,14 +354,14 @@ def main():
         model = torch.nn.DataParallel(model)
 
         # Prepare optimizer
-        # param_optimizer = list(model.named_parameters())
+        param_optimizer = list(model.named_parameters())
         #
         # # hack to remove pooler, which is not used
         # # thus it produce None grad that break apex
-        # param_optimizer = [n for n in param_optimizer if 'pooler' not in n[0]]
+        param_optimizer = [n for n in param_optimizer if 'pooler' not in n[0]]
         # 分层学习率
-        bert_param_optimizer = [(n, p) for n, p in list(model.bert.named_parameters()) if "pooler" not in n]
-        other_param_optimizer = [(n, p) for n, p in model.named_parameters() if "bert" not in n]
+        bert_param_optimizer = [(n, p) for n, p in param_optimizer if ("bert" in n)]
+        other_param_optimizer = [(n, p) for n, p in param_optimizer if ("bert" not in n)]
 
 
 
