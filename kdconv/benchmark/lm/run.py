@@ -7,10 +7,14 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "../../"))
 import warnings
 warnings.filterwarnings("ignore")
 
+import random
 import argparse
 import time
 
 from utils import Storage
+
+from benchmark.lm.main import main
+
 
 def run(*argv):
 
@@ -93,10 +97,7 @@ def run(*argv):
 	args.checkpoint_steps = 100
 	args.checkpoint_max_to_keep = 5
 
-	import random
 	random.seed(args.seed)
-
-	from .main import main
 
 	main(args)
 
