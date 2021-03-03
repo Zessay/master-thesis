@@ -210,7 +210,7 @@ class Seq2SeqModel(object):
 			batched_data = data.get_next_batch(key_name)
 		loss /= times
 
-		logger.info(f'Evaluate loss: {loss:.2f} | perplexity on {key_name} set: {np.exp(loss): .2f}')
+		logger.info(f'Evaluate loss: {float(loss):.2f} | perplexity on {key_name} set: {float(np.exp(loss)): .2f}')
 		# print(loss)
 		return loss
 

@@ -234,7 +234,7 @@ class HredModel(object):
 			batched_data = data.get_next_batch(key_name)
 		loss /= times
 
-		logger.info('    perplexity on %s set: %.2f' % (key_name, np.exp(loss)))
+		logger.info('    perplexity on %s set: %.2f' % (key_name, float(np.exp(loss))))
 		logger.info(loss)
 		return loss
 

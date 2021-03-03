@@ -9,7 +9,9 @@ warnings.filterwarnings("ignore")
 
 import argparse
 import time
+import random
 
+from benchmark.hredmem.main import main
 from utils import Storage
 
 
@@ -101,10 +103,7 @@ def run(*argv):
 	args.checkpoint_steps = 100
 	args.checkpoint_max_to_keep = 5
 
-	import random
 	random.seed(args.seed)
-
-	from .main import main
 
 	main(args)
 

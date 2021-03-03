@@ -5,11 +5,11 @@ python run.py \
   --name=hredmem \
   --wv_path=/data/models/wordvector/chinese \
   --datapath=../../data/travel \
-  --epoch=20 \
+  --epoch=100 \
   --batch_size=32 \
   --max_sent_length=512 \
   --max_know_length=100 \
-  --max_decoder_length=50 \
+  --max_decoder_length=30 \
   --output_dir=/data/results/kdconv/output/travel/hredmem \
   --model_dir=/data/results/kdconv/model/travel/hredmem \
   --cache_dir=/data/results/kdconv/cache/travel/hredmem \

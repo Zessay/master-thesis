@@ -5,10 +5,10 @@ python run.py \
   --name=LM \
   --wv_path=/data/models/wordvector/chinese \
   --datapath=../../data/music \
-  --epoch=20 \
+  --epoch=100 \
   --batch_size=32 \
   --max_sent_length=512 \
-  --max_decoder_length=50 \
+  --max_decoder_length=30 \
   --output_dir=/data/results/kdconv/output/music/lm \
   --model_dir=/data/results/kdconv/model/music/lm \
   --cache_dir=/data/results/kdconv/cache/music/lm \

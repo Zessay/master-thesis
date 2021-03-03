@@ -9,7 +9,7 @@ from myCoTK.dataloader import MyMemSeq2Seq
 from myCoTK.wordvector import TencentChinese
 from utils import debug, try_cache
 
-from .model import Seq2SeqModel
+from benchmark.seq2seqmem.model import Seq2SeqModel
 
 logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s - %(message)s',
                     datefmt = '%m/%d/%Y %H:%M:%S',

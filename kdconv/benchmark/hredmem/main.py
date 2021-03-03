@@ -10,7 +10,7 @@ from myCoTK.dataloader import MyMemHRED
 from myCoTK.wordvector import TencentChinese
 from utils import debug, try_cache
 
-from .model import HredModel
+from benchmark.hredmem.model import HredModel
 
 logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s - %(message)s',
                     datefmt = '%m/%d/%Y %H:%M:%S',
