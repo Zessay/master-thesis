@@ -5,9 +5,9 @@ python run.py \
   --name=LM \
   --wv_path=/data/models/wordvector/chinese \
   --datapath=../../data/film \
-  --epoch=100 \
+  --epoch=50 \
   --batch_size=32 \
-  --max_sent_length=512 \
+  --max_sent_length=256 \
   --max_decoder_length=30 \
   --output_dir=/data/results/kdconv/output/film/lm \
   --model_dir=/data/results/kdconv/model/film/lm \

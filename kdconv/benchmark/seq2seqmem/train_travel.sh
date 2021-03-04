@@ -5,9 +5,9 @@ python run.py \
   --name=seq2seqmem \
   --wv_path=/data/models/wordvector/chinese \
   --datapath=../../data/travel \
-  --epoch=100 \
+  --epoch=50 \
   --batch_size=32 \
-  --max_sent_length=512 \
+  --max_sent_length=256 \
   --max_know_length=100 \
   --max_decoder_length=30 \
   --output_dir=/data/results/kdconv/output/travel/seq2seqmem \
